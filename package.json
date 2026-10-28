@@ -7,7 +7,7 @@
   "author": "drk",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node build.js",
     "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
   },
   "dependencies": {

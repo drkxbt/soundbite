@@ -19,6 +19,10 @@
     "skipLibCheck": true
   },
   "include": [
-    "cues.ts"
+    "index.ts",
+    "audio.ts",
+    "cues.ts",
+    "transcribe.ts",
+    "transcribe-worker.ts"
   ]
 }
