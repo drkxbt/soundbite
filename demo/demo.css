@@ -24,3 +24,28 @@ body { margin: 0; color: #f2f2f0; font-family: "Geist", ui-sans-serif, system-ui
   .page { padding: 14px 16px 24px; gap: 20px; }
   .intro h1 { font-size: 22px; }
 }
+
+/* The card recordings: the app alone, filling the frame. */
+html[data-tour] .top, html[data-tour] .intro { display: none; }
+html[data-tour], html[data-tour] body { height: 100%; overflow: hidden; }
+html[data-tour] .page { height: 100%; min-height: 0; padding: 14px; gap: 0; width: 100%; }
+html[data-tour] .sb-editor { min-height: 0; }
+
+/* The tour's pointer: where a recorded click is, pressed or about to lift. */
+.finger {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
+  opacity: 0;
+  scale: 0.8;
+  pointer-events: none;
+  transition: opacity 140ms ease, scale 140ms ease;
+}
+.finger[data-on] { opacity: 1; scale: 1; }
+.finger[data-down] { scale: 0.86; }
