@@ -79,14 +79,35 @@ export function isHallucination(words: Word[]): boolean {
 }
 
 /**
- * The captions after transcribing `range`: the fresh ones in place of any that touched it, in time order. A caption
- * that straddles an edge keeps the words it has outside the range; one without word times can't be cut, so it goes.
+ * Captions that are no real speech dropped from a long stretch, the rest kept: a subtitle credit, a word stuck on
+ * repeat, a line with no letters, or one of Whisper's stock phrases standing alone between pauses of two seconds or
+ * more. A "Thank you." in the flow of talk stays.
+ */
+export function dropHallucinations(cues: Cue[]): Cue[] {
+  return cues.filter((cue, index) => {
+    const line = plain(cue.text);
+    if (!/\p{L}/u.test(line) || CREDITS.some((credit) => line.includes(credit))) return false;
+    const words = cue.words ?? cue.text.split(/\s+/).map((text) => ({ text, start: cue.start, end: cue.end }));
+    let run = 1;
+    for (let i = 1; i < words.length; i++) {
+      run = words[i].text.toLowerCase() === words[i - 1].text.toLowerCase() ? run + 1 : 1;
+      if (run > 5) return false;
+    }
+    const alone = (cues[index - 1] ? cue.start - cues[index - 1].end >= 2 : true) && (cues[index + 1] ? cues[index + 1].start - cue.end >= 2 : true);
+    return !(STOCK.has(line) && alone);
+  });
+}
+
+/**
+ * The captions after transcribing `range`: the fresh ones in place of any that touched it, in time order. A word
+ * belongs to the range it starts in, so a caption that straddles an edge keeps the words that start outside the
+ * range; one without word times can't be cut, so it goes.
  */
 export function mergeCues(existing: Cue[], fresh: Cue[], [start, end]: [number, number]): Cue[] {
   const kept = existing.flatMap((cue) => {
     if (cue.end <= start || cue.start >= end) return [cue];
     if (!cue.words?.length) return [];
-    return [cue.words.filter((word) => word.end <= start), cue.words.filter((word) => word.start >= end)]
+    return [cue.words.filter((word) => word.start < start), cue.words.filter((word) => word.start >= end)]
       .filter((part) => part.length)
       .map((part) => ({ ...cue, start: part[0].start, end: part.at(-1)!.end, text: part.map((word) => word.text).join(" "), words: part }));
   });

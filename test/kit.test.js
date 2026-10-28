@@ -42,3 +42,7 @@ test("the music's level is kept, the music itself is not", () => {
   assert.deepEqual(parseKit(JSON.stringify({ musicVolume: 3 })), {});
   assert.deepEqual(parseKit(JSON.stringify({ musicVolume: "0.4" })), {});
 });
+
+test("every shape the editor offers is kept, the 9:16 story among them", () => {
+  for (const layout of ["square", "portrait", "story", "landscape"]) assert.deepEqual(parseKit(JSON.stringify({ layout })), { layout });
+});

@@ -10,7 +10,7 @@ export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layou
 };
 
 const KEY = "soundbite:kit";
-const LAYOUTS: Layout[] = ["square", "portrait", "landscape"];
+const LAYOUTS: Layout[] = ["square", "portrait", "story", "landscape"];
 const VISUALS: Visual[] = ["bars", "wave", "pulse"];
 
 /** A saved kit, keeping only fields of the right kind. Anything unreadable is an empty kit; it never throws. */

@@ -30,6 +30,8 @@
     "config.ts",
     "app.ts",
     "panel.ts",
-    "failures.ts"
+    "failures.ts",
+    "sweep.ts",
+    "fonts.ts"
   ]
 }

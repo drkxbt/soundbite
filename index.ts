@@ -1,4 +1,5 @@
-export { isSilent, rangeSamples, SPEECH_RATE, type Recording } from "./audio.js";
+export { isSilent, SPEECH_RATE } from "./audio.js";
+export { Coverage, cutPoint, type Span } from "./sweep.js";
 export { isHallucination, mergeCues, toWords, wordsToCues, type Chunk } from "./cues.js";
 export { createTranscriber, type Progress, type Transcriber } from "./transcribe.js";
 export { fitPicture, loadKit, parseKit, saveKit, shrinkCover, type Kit } from "./kit.js";

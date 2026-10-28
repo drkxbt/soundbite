@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isHallucination, mergeCues, toWords, wordsToCues } from "../dist/cues.js";
+import { dropHallucinations, isHallucination, mergeCues, toWords, wordsToCues } from "../dist/cues.js";
 
 const words = (line, start = 0, step = 0.3) =>
   line.split(" ").map((text, i) => ({ text, start: start + i * step, end: start + i * step + 0.25 }));
@@ -96,4 +96,23 @@ test("a caption that straddles the transcribed range keeps the words outside it"
   assert.deepEqual(merged[0].words.map((word) => word.text), ["a", "b"]);
   const tail = mergeCues([straddler], [], [17, 21.1]);
   assert.deepEqual(tail.map((cue) => [cue.start, cue.end, cue.text]), [[21.2, 22, "d"]]);
+});
+
+test("a word belongs to the range it starts in, so one that starts before the range is kept, not lost", () => {
+  const existing = [{ start: 9.6, end: 10.8, text: "alpha beta", words: [{ text: "alpha", start: 9.6, end: 10.2 }, { text: "beta", start: 10.3, end: 10.8 }] }];
+  const merged = mergeCues(existing, [], [10, 20]);
+  assert.deepEqual(merged.map((cue) => cue.text), ["alpha"]);
+});
+
+test("in a long stretch only the captions that are no real speech are dropped, the rest stay", () => {
+  const cue = (line, start) => ({ start, end: start + line.split(" ").length * 0.3, text: line, words: words(line, start) });
+  const cues = [
+    cue("We shipped the first version on a Friday.", 0),
+    cue("the the the the the the the", 4),
+    cue("Thank you.", 7),
+    cue("And people actually used it.", 8),
+    cue("Subtitles by the Amara.org community", 20),
+    cue("Thank you.", 60),
+  ];
+  assert.deepEqual(dropHallucinations(cues).map((item) => item.text), ["We shipped the first version on a Friday.", "Thank you.", "And people actually used it."]);
 });

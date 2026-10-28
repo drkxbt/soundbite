@@ -1,6 +1,6 @@
 # soundbite
 
-Turn the best minute of an X Space, a podcast or a voice note into a captioned video for X, TikTok, Reels, Shorts or LinkedIn, in the browser. Open the recording and drag over the moment, and Whisper writes out every word and times it as it is said. Pick a look and download an MP4. Everything runs on your device: the audio, the transcript and your picture are never uploaded.
+Turn the best minute of an X Space, a podcast or a voice note into a captioned video for X, TikTok, Reels, Shorts or LinkedIn, in the browser. Open the recording and Whisper writes out every word and times it as it is said, starting with the moment you select. Pick a look and download an MP4. Everything runs on your device: the audio, the transcript and your picture are never uploaded.
 
 Make a clip on [drk.vc/soundbite](https://drk.vc/soundbite), nothing to install.
 
@@ -8,10 +8,11 @@ Make a clip on [drk.vc/soundbite](https://drk.vc/soundbite), nothing to install.
 
 Hosted audiogram apps upload the recording, then charge a monthly plan for automatic captions and a clip without a watermark. Soundbite does both on the device and is MIT licensed, every feature included.
 
-- **Captions without typing.** Whisper (tiny, multilingual) runs in a worker through transformers.js. The encoder runs on WebGPU and the decoder on WebAssembly when there is a GPU, and everything runs on WebAssembly when there isn't. Only the part you picked is transcribed, so two minutes take about 20 to 45 seconds on a laptop. Every word keeps its own time, so the captions light up as each word is said.
-- **Several moments, one clip.** Add each moment as a part and they play back to back, in an order you can drag; each new part is transcribed as it's added, and the joins fade so a cut mid-word doesn't click.
+- **The whole recording, captioned.** Open a recording and every minute of it is captioned, two minutes at a time, starting with the part you select; MP3 and WAV files can be hours long. Each stretch ends at a sentence's end or a pause where it can, so words aren't cut at the joins. Auto captions at the top pauses and resumes, and the line beside it says how far it has got.
+- **Captions without typing.** Whisper (tiny, multilingual) runs in a worker through transformers.js. The encoder runs on WebGPU and the decoder on WebAssembly when there is a GPU, and everything runs on WebAssembly when there isn't. The recording is transcribed two minutes at a time, the part you selected first; each two minutes takes about 10 to 45 seconds on a laptop. Every word keeps its own time, so the captions light up as each word is said.
+- **Several moments, one clip.** Add each moment as a part and they play back to back, in an order you can drag; parts are captioned before the rest of the recording, and the joins fade so a cut mid-word doesn't click.
 - **Fix anything.** The captions land in Audiogram's editor, where any line can be retyped or retimed by tapping along. Silence is caught before Whisper runs, and the stock phrases Whisper writes over noise, in any language, count as no speech, so your captions stay as they were.
-- **Your look on it.** A background picture behind the whole clip, dimmed so the words stay readable, up to three links along the bottom, and music under your voice at the level you set. Then Audiogram's own: square, 4:5 or 16:9, bars, a wave or rings, five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
+- **Your look on it.** A background picture behind the whole clip, dimmed so the words stay readable, up to three links along the bottom, and music under your voice at the level you set. Then Audiogram's own: square, 4:5, 9:16 or 16:9; bars, a wave or a pulse; five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
 - **Your look, kept.** Name, handle, links, pictures, shape and colours are kept in this browser and filled in next time.
 - **A credit, and a way to drop it.** Clips made at drk.vc/soundbite carry a small "made with drk.vc/soundbite" in the corner. Watching one short rewarded ad removes it from the next download; until ads are switched on there, it comes off for free. A copy you run yourself has no ad unit, so its credit comes off for free too.
 

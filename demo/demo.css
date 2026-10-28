@@ -17,7 +17,9 @@ body { margin: 0; color: #f2f2f0; font-family: "Geist", ui-sans-serif, system-ui
 .sample { padding: 0; border: 0; background: none; color: #4ff3c4; font: inherit; text-decoration: underline; text-decoration-color: rgb(79 243 196 / 0.4); text-underline-offset: 3px; cursor: pointer; }
 .sample:hover { text-decoration-color: currentColor; }
 .sample:focus-visible { outline: 2px solid #4ff3c4; outline-offset: 2px; border-radius: 2px; }
-.app { flex: 1; display: flex; min-height: 0; }
+/* The app fills the screen under the intro, as on drk.vc; below about 800 px it stacks and takes the height it needs. */
+.app { display: flex; height: min(880px, calc(100dvh - 40px)); min-height: 620px; }
+@media (max-width: 820px) { .app { height: auto; } }
 .app > .sb { flex: 1; }
 
 @media (max-width: 640px) {
@@ -30,6 +32,7 @@ html[data-tour] .top, html[data-tour] .intro { display: none; }
 html[data-tour], html[data-tour] body { height: 100%; overflow: hidden; }
 html[data-tour] .page { height: 100%; min-height: 0; padding: 14px; gap: 0; width: 100%; }
 html[data-tour] .sb-editor { min-height: 0; }
+html[data-tour] .app { flex: 1; height: auto; min-height: 0; }
 
 /* The tour's pointer: where a recorded click is, pressed or about to lift. */
 .finger {

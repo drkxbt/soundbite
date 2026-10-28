@@ -1,5 +1,5 @@
-/* Soundbite: Audiogram's editor in drk.vc's dark world, its transcribe key in the captions heading and its credit key
-   by the export. Every colour is a custom property, so a host page can retheme it from outside. */
+/* Soundbite: Audiogram's editor in drk.vc's dark world, with its captions key at the top and its credit key by
+   Download. Every colour is a custom property, so a host page can retheme it from outside. */
 .sb {
   --sb-ground: #0c0c0d;
   --sb-panel: #121214;
@@ -39,33 +39,41 @@
 .sb svg .fill { fill: currentColor; stroke: none; }
 .sb ::selection { background: var(--sb-mint-wash); color: var(--sb-text); }
 
-/* The status of the transcript, on its own line under the captions heading: words, a count, and a thin meter. */
-.sb-note { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 6px 10px; margin-top: -6px; font-size: 12.5px; }
-.sb-status { margin: 0; min-width: 0; color: var(--sb-muted); text-wrap: pretty; transition: color 200ms ease; }
+/* The captions control at the top: the key, then a line that says how far the captions are, over a thin meter. */
+.sb-captions { display: flex; flex: 1 1 280px; align-items: center; gap: 10px; min-width: 0; }
+.sb-progress { display: grid; flex: 1; gap: 5px; min-width: 0; max-width: 440px; }
+.sb-status {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--sb-muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  transition: color 200ms ease;
+}
 .sb[data-tone="busy"] .sb-status { color: var(--sb-text); font-variant-numeric: tabular-nums; }
 .sb[data-tone="done"] .sb-status { color: var(--sb-mint-text); }
 .sb[data-tone="warn"] .sb-status { color: var(--sb-warn); }
-.sb-percent { flex: none; color: var(--sb-text); font-variant-numeric: tabular-nums; }
+/* What to do next is never cut off. */
+.sb[data-tone="warn"] .sb-status, .sb[data-tone="done"] .sb-status { display: block; -webkit-line-clamp: unset; }
+.sb-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sb-percent { flex: none; color: var(--sb-text); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .sb-percent:empty { display: none; }
-.sb-heard { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* The transcribe key wears the mint the way Audiogram's export does, but quieter: its icon and a wash. */
-.sb .sb-transcribe { color: var(--sb-mint-text); background: var(--sb-mint-wash); }
-.sb .sb-transcribe:not(:disabled):hover { background: rgb(47 240 184 / 0.18); color: var(--sb-mint); }
-.sb .sb-transcribe:disabled { color: var(--sb-muted); background: transparent; }
-.sb[data-working] .sb-transcribe { color: var(--sb-text); background: var(--sb-raised); }
-
-/* Progress runs under the status while the model downloads or listens, and takes no room otherwise. */
-.sb-meter {
-  position: relative;
-  grid-column: 1 / -1;
-  display: none;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--sb-line);
-  opacity: 0;
-  transition: opacity 200ms ease;
+/* The captions key is the one to press after opening a recording: mint, like Download, but quieter. */
+.sb .sb-transcribe { background: var(--sb-mint-wash); color: var(--sb-mint-text); font-weight: 600; }
+@media (hover: hover) {
+  .sb .sb-transcribe:not(:disabled):hover { background: rgb(47 240 184 / 0.2); color: var(--sb-mint); }
 }
+.sb[data-working] .sb-transcribe { background: var(--sb-raised); color: var(--sb-text); }
+.sb .sb-transcribe:disabled { opacity: 1; background: transparent; color: var(--sb-muted); }
+.sb[data-tone="done"] .sb-transcribe:disabled { color: var(--sb-mint-text); }
+
+/* Progress under the status while the model downloads or the captions are written; no room taken otherwise. */
+.sb-meter { position: relative; display: none; height: 3px; overflow: hidden; border-radius: 2px; background: var(--sb-line); }
 .sb-meter::after {
   content: "";
   position: absolute;
@@ -76,16 +84,48 @@
   transform: scaleX(var(--done, 0));
   transition: transform 300ms var(--sb-ease);
 }
-.sb[data-working] .sb-meter { display: block; opacity: 1; }
-@starting-style {
-  .sb[data-working] .sb-meter { opacity: 0; }
+.sb[data-working] .sb-meter { display: block; }
+
+/* With the credit off, its key shows it, in the mint of a clean download, and what happened shows under it a moment. */
+.sb[data-clean] .sb-credit { background: var(--sb-mint-wash); color: var(--sb-mint-text); }
+.sb-credit-wrap { position: relative; display: flex; }
+.sb-credit-note {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  width: max-content;
+  max-width: 280px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--sb-raised);
+  box-shadow: 0 0 0 1px var(--sb-line), 0 8px 24px -8px rgb(0 0 0 / 0.8);
+  color: var(--sb-text);
+  font-size: 12.5px;
+  text-wrap: pretty;
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none;
+  transition: opacity 160ms ease, translate 160ms var(--sb-ease);
 }
+.sb[data-credit-note] .sb-credit-note { opacity: 1; translate: 0 0; }
+/* On the dark panel, keys get an edge so they read as keys. */
+.sb .ag-key:not(.ag-export):not(.sb-transcribe), .sb .ag-tab[aria-selected="true"], .sb .ag-tile { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }
+.sb .ag-tile[aria-checked="true"] { box-shadow: inset 0 0 0 1.5px var(--ag-accent); }
+.sb .sb-redo { justify-self: start; height: 30px; font-size: 12.5px; }
 
-/* With the credit off, its key shows it, in the mint of a clean download. */
-.sb .sb-credit[aria-pressed="true"] { color: var(--sb-mint-text); background: var(--sb-mint-wash); box-shadow: none; }
-
-.sb-editor { flex: 1; min-height: 560px; }
+.sb-editor { flex: 1; min-height: 0; }
 .sb-editor > .ag { height: 100%; }
+
+/* Narrow: the captions control takes the first row of its own, and the other keys share the next one. */
+@container (max-width: 760px) {
+  .sb .sb-captions { order: -1; flex: 1 1 100%; }
+  .sb .sb-progress { max-width: none; }
+  .sb .ag-header .ag-grow { display: none; }
+  .sb .ag-header > .ag-key, .sb .sb-credit-wrap { flex: 1 1 auto; justify-content: center; }
+  .sb .sb-credit { flex: 1; justify-content: center; }
+}
 
 /* After a download: a small card in the corner, in the top layer, never in the way. */
 .sb-thanks {
@@ -169,11 +209,11 @@
 .sb-guide a:focus-visible { outline: 2px solid var(--sb-mint-text); outline-offset: 2px; border-radius: 2px; }
 
 @media (max-width: 640px) {
-  .sb-editor { min-height: 640px; }
+  .sb-editor { min-height: 0; }
   .sb-thanks { inset: auto 16px 16px; width: auto; }
   .sb-guide { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 28px; padding-top: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sb-thanks, .sb-meter::after { transition: none; }
+  .sb-thanks, .sb-meter::after, .sb-credit-note { transition: none; }
 }
