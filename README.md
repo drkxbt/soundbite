@@ -10,8 +10,8 @@ Hosted audiogram apps upload the recording, then charge a monthly plan for autom
 
 - **Captions without typing.** Whisper (tiny, multilingual) runs in a worker through transformers.js. The encoder runs on WebGPU and the decoder on WebAssembly when there is a GPU, and everything runs on WebAssembly when there isn't. Only the part you picked is transcribed, so two minutes take about 20 to 45 seconds on a laptop. Every word keeps its own time, so the captions light up as each word is said.
 - **Fix anything.** The captions land in Audiogram's editor, where any line can be retyped or retimed by tapping along. Silence is caught before Whisper runs, and the stock phrases Whisper writes over noise, in any language, count as no speech, so your captions stay as they were.
-- **The rest of Audiogram.** Square, 4:5 or 16:9, bars, a wave or rings, five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
-- **Your look, kept.** Name, handle, picture, shape and colours are kept in this browser and filled in next time.
+- **Your look on it.** A background picture behind the whole clip, dimmed so the words stay readable, and your logo small in the corner. Then Audiogram's own: square, 4:5 or 16:9, bars, a wave or rings, five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
+- **Your look, kept.** Name, handle, pictures, logo, shape and colours are kept in this browser and filled in next time.
 - **A credit, and a way to drop it.** Clips made at drk.vc/soundbite carry a small "made with drk.vc/soundbite" in the corner. Watching one short rewarded ad removes it from the next download; until ads are switched on there, it comes off for free. A copy you run yourself has no ad unit, so its credit comes off for free too.
 
 The speech model is about 44 to 66 MB on the first use, downloaded from Hugging Face and then kept by the browser. ONNX Runtime's WebAssembly (27 MB) is served next to the app.

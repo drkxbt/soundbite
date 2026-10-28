@@ -4,7 +4,7 @@ import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
 import { credit } from "./credit.js";
 import { isHallucination, mergeCues, wordsToCues } from "./cues.js";
-import { loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
+import { fitPicture, loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
 import { showThanks } from "./panel.js";
 import { createTranscriber, type Progress } from "./transcribe.js";
 
@@ -100,13 +100,24 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   let savedTimer = 0;
   const shrunk = new WeakMap<Blob, Promise<string>>();
 
+  // Each picture is kept small: the cover as a 256 px square, a background up to 1280 px, a logo up to 256 px with
+  // its transparency.
+  const shrinkers = {
+    cover: (blob: Blob) => shrinkCover(blob),
+    background: (blob: Blob) => fitPicture(blob, 1280, "image/jpeg"),
+    logo: (blob: Blob) => fitPicture(blob, 256, "image/png"),
+  };
+
   async function keep(next: Settings) {
     const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, layout: next.layout, visual: next.visual };
     if (typeof next.theme === "number") entry.theme = next.theme;
-    if (next.cover instanceof Blob) {
-      if (!shrunk.has(next.cover)) shrunk.set(next.cover, shrinkCover(next.cover));
-      entry.cover = await shrunk.get(next.cover)!.catch(() => undefined);
-    } else if (typeof next.cover === "string" && next.cover.startsWith("data:image/")) entry.cover = next.cover;
+    for (const field of ["cover", "background", "logo"] as const) {
+      const picture = next[field];
+      if (picture instanceof Blob) {
+        if (!shrunk.has(picture)) shrunk.set(picture, shrinkers[field](picture));
+        entry[field] = await shrunk.get(picture)!.catch(() => undefined);
+      } else if (typeof picture === "string" && picture.startsWith("data:image/")) entry[field] = picture;
+    }
     saveKit(entry);
   }
 

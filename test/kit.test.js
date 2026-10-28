@@ -19,3 +19,9 @@ test("a kit saved by Soundbite reads back the same", () => {
   const kit = { title: "Shipping in public", speaker: "drk", handle: "@drkxbt", layout: "portrait", visual: "wave", theme: 2, cover: "data:image/jpeg;base64,/9j/4AAQ" };
   assert.deepEqual(parseKit(JSON.stringify(kit)), kit);
 });
+
+test("a background picture and a logo are kept as pictures, and nothing else in their place", () => {
+  const kit = { speaker: "drk", background: "data:image/jpeg;base64,/9j/4AAQ", logo: "data:image/png;base64,iVBORw0KGgo=" };
+  assert.deepEqual(parseKit(JSON.stringify(kit)), kit);
+  assert.deepEqual(parseKit(JSON.stringify({ background: "https://example.com/a.jpg", logo: 5 })), {});
+});

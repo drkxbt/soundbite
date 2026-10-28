@@ -123,12 +123,62 @@
 .sb-thanks .sb-follow, .sb-thanks .sb-star { background: var(--sb-panel); color: var(--sb-text); box-shadow: 0 0 0 1px var(--sb-line); }
 .sb-thanks .sb-star:hover { color: #f5c451; }
 
+/* How to use: a short guide under the app, the steps first and the fine print beside them. */
+.sb-guide {
+  --sb-text: #f2f2f0;
+  --sb-muted: #a3a3a0;
+  --sb-line: rgb(255 255 255 / 0.08);
+  --sb-mint: #2ff0b8;
+  --sb-mint-text: #4ff3c4;
+  --sb-mint-wash: rgb(47 240 184 / 0.12);
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 32px 56px;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--sb-line);
+  color: var(--sb-muted);
+  font-family: var(--sb-font, "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.sb-guide h2, .sb-guide h3 { margin: 0 0 16px; color: var(--sb-text); font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+.sb-guide h2 { font-size: 20px; }
+.sb-guide h3 { font-size: 15px; }
+.sb-guide ol, .sb-guide ul { margin: 0; padding: 0; list-style: none; }
+.sb-guide ol { display: grid; gap: 14px; counter-reset: step; }
+.sb-guide ol li { position: relative; max-width: 68ch; padding-left: 40px; counter-increment: step; text-wrap: pretty; }
+/* The order matters here, so the steps carry their numbers, small and quiet. */
+.sb-guide ol li::before {
+  content: counter(step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-top: -1px;
+  border-radius: 7px;
+  background: var(--sb-mint-wash);
+  color: var(--sb-mint-text);
+  font: 500 12.5px/1 "Geist Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.sb-guide b { color: var(--sb-text); font-weight: 600; }
+.sb-guide ul li { padding: 10px 0; border-top: 1px solid var(--sb-line); text-wrap: pretty; }
+.sb-guide ul li:first-child { padding-top: 0; border-top: 0; }
+.sb-guide a { color: var(--sb-mint-text); text-decoration: underline; text-decoration-color: rgb(79 243 196 / 0.4); text-underline-offset: 3px; transition: text-decoration-color 150ms ease; }
+.sb-guide a:hover { text-decoration-color: currentColor; }
+.sb-guide a:focus-visible { outline: 2px solid var(--sb-mint-text); outline-offset: 2px; border-radius: 2px; }
+
 @media (max-width: 640px) {
   .sb-bar { flex-wrap: wrap; }
   .sb-transcript { flex: 1 1 100%; }
   .sb-clean { flex: 1 1 100%; justify-content: space-between; }
   .sb-editor { min-height: 640px; }
   .sb-thanks { inset: auto 16px 16px; width: auto; }
+  .sb-guide { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 28px; padding-top: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

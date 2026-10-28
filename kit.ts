@@ -1,7 +1,12 @@
 import type { Layout, Settings, Visual } from "@drkxbt/audiogram";
 
-/** The look a user keeps between clips: Audiogram's settings, with the picture shrunk to a data URL. */
-export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layout" | "visual">> & { theme?: number; cover?: string };
+/** The look a user keeps between clips: Audiogram's settings, with each picture shrunk to a data URL. */
+export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layout" | "visual">> & {
+  theme?: number;
+  cover?: string;
+  background?: string;
+  logo?: string;
+};
 
 const KEY = "soundbite:kit";
 const LAYOUTS: Layout[] = ["square", "portrait", "landscape"];
@@ -24,7 +29,10 @@ export function parseKit(raw: string | null): Kit {
   if (LAYOUTS.includes(value.layout as Layout)) kit.layout = value.layout as Layout;
   if (VISUALS.includes(value.visual as Visual)) kit.visual = value.visual as Visual;
   if (Number.isInteger(value.theme) && (value.theme as number) >= 0) kit.theme = value.theme as number;
-  if (typeof value.cover === "string" && value.cover.startsWith("data:image/")) kit.cover = value.cover;
+  for (const field of ["cover", "background", "logo"] as const) {
+    const picture = value[field];
+    if (typeof picture === "string" && picture.startsWith("data:image/")) kit[field] = picture;
+  }
   return kit;
 }
 
@@ -55,4 +63,19 @@ export async function shrinkCover(blob: Blob, size = 256): Promise<string> {
   canvas.getContext("2d")!.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
   image.close();
   return canvas.toDataURL("image/jpeg", 0.86);
+}
+
+/**
+ * A picture shrunk to fit `size` pixels on its longer side, its shape kept, as a data URL: a JPEG for a background,
+ * a PNG for a logo so its transparency survives.
+ */
+export async function fitPicture(blob: Blob, size: number, type: "image/jpeg" | "image/png"): Promise<string> {
+  const image = await createImageBitmap(blob);
+  const scale = Math.min(1, size / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+  return canvas.toDataURL(type, 0.82);
 }
