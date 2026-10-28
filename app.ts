@@ -128,6 +128,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       clearTimeout(savedTimer);
       savedTimer = window.setTimeout(() => void keep(next), 500);
     },
+    onParts: (parts) => captionParts(parts),
     onExport: ({ blob, extension }) => {
       const link = document.createElement("a");
       const now = new Date();
@@ -176,12 +177,28 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
 
   function stop() {
     run++;
+    queue = [];
     transcriber.cancel();
     settle();
     idle();
   }
 
-  async function transcribe() {
+  // Parts added to the clip without captions are transcribed one after another, after whatever is running.
+  let queue: Array<[number, number]> = [];
+  const hasCaptions = ([start, end]: [number, number]) => editor.captions.some((cue) => cue.end > start && cue.start < end);
+  function next() {
+    while (queue.length) {
+      const span = queue.shift()!;
+      if (!hasCaptions(span)) return void transcribe(span);
+    }
+  }
+  function captionParts(parts: Array<[number, number]>) {
+    queue = parts.filter((span) => !hasCaptions(span));
+    if (!busy) next();
+  }
+
+  /** Transcribes one stretch of the recording: the selected one unless a part is named. */
+  async function transcribe(span: [number, number] = editor.range) {
     if (busy) return stop();
     const source = editor.source;
     const audio = editor.audio;
@@ -194,7 +211,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     setMeter(0);
     say("Reading the recording", "busy");
     try {
-      const [start, end] = editor.range;
+      const [start, end] = span;
       const samples = await rangeSamples(audio, start, end);
       if (!current()) return;
       if (isSilent(samples)) return say("No speech found in this part", "warn");
@@ -213,7 +230,10 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       else if (name === "LoadError") say("This device couldn't start the speech model. Try another browser, or close a few tabs", "warn");
       else say("Couldn't transcribe this part. Try again, or a shorter part", "warn");
     } finally {
-      if (mine === run) settle();
+      if (mine === run) {
+        settle();
+        next();
+      }
     }
   }
 
