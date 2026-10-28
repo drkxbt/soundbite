@@ -164,7 +164,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     const [start, end] = editor.range;
     const part = `${clock(start)} to ${clock(end)}`;
     if (!ready()) say("Open a recording, then pick the part to share");
-    else if (editor.captions.some((cue) => cue.end > start && cue.start < end)) say(`Captions for ${part}. Fix any word in the list on the right`, "done");
+    else if (editor.captions.some((cue) => cue.end > start && cue.start < end)) say(`Captions for ${part}. Fix any word in the captions list`, "done");
     else say(`No captions yet for ${part}`);
   };
 
@@ -203,7 +203,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       if (isHallucination(words)) say("No speech found in this part", "warn");
       else {
         editor.setCaptions(mergeCues(editor.captions, wordsToCues(words), [start, end]));
-        say("Captions in. Fix any word in the list on the right", "done");
+        say("Captions in. Fix any word in the captions list", "done");
       }
     } catch (error) {
       if (!current()) return;
