@@ -20,10 +20,21 @@ test("a kit saved by Soundbite reads back the same", () => {
   assert.deepEqual(parseKit(JSON.stringify(kit)), kit);
 });
 
-test("a background picture and a logo are kept as pictures, and nothing else in their place", () => {
-  const kit = { speaker: "drk", background: "data:image/jpeg;base64,/9j/4AAQ", logo: "data:image/png;base64,iVBORw0KGgo=" };
+test("a background picture is kept as a picture, and nothing else in its place", () => {
+  const kit = { speaker: "drk", background: "data:image/jpeg;base64,/9j/4AAQ" };
   assert.deepEqual(parseKit(JSON.stringify(kit)), kit);
-  assert.deepEqual(parseKit(JSON.stringify({ background: "https://example.com/a.jpg", logo: 5 })), {});
+  assert.deepEqual(parseKit(JSON.stringify({ background: "https://example.com/a.jpg" })), {});
+});
+
+test("a logo kept by an older Soundbite is left behind, since clips no longer carry one", () => {
+  assert.deepEqual(parseKit(JSON.stringify({ speaker: "drk", logo: "data:image/png;base64,iVBORw0KGgo=" })), { speaker: "drk" });
+});
+
+test("up to three links are kept as text, anything else in their place dropped", () => {
+  assert.deepEqual(parseKit(JSON.stringify({ links: ["drk.vc", "x.com/drkxbt"] })), { links: ["drk.vc", "x.com/drkxbt"] });
+  assert.deepEqual(parseKit(JSON.stringify({ links: ["a.com", 5, "b.com", "c.com", "d.com"] })), { links: ["a.com", "b.com", "c.com"] });
+  assert.deepEqual(parseKit(JSON.stringify({ links: "drk.vc" })), {});
+  assert.deepEqual(parseKit(JSON.stringify({ links: ["x".repeat(200)] })), {});
 });
 
 test("the music's level is kept, the music itself is not", () => {

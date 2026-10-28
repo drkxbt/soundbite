@@ -3,15 +3,23 @@ import assert from "node:assert/strict";
 import { credit } from "../dist/credit.js";
 import { watchAd } from "../dist/ads.js";
 
-// A 2D context that keeps what was written and where, and accepts everything else.
+// A 2D context that keeps what was written and the shapes drawn, measures text at half its size a letter, and
+// accepts everything else.
 function recordingContext() {
   const texts = [];
+  const shapes = [];
   const state = { textAlign: "start", textBaseline: "alphabetic", fillStyle: "#000", font: "", globalAlpha: 1 };
+  const size = () => Number(state.font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? 10);
+  const calls = {
+    fillText: (text, x, y) => texts.push({ text, x, y, align: state.textAlign, font: state.font }),
+    measureText: (text) => ({ width: text.length * size() * 0.5 }),
+    roundRect: (x, y, width, height, radius) => shapes.push({ x, y, width, height, radius }),
+  };
   const ctx = new Proxy(state, {
-    get: (target, key) => (key === "fillText" ? (text, x, y) => texts.push({ text, x, y, align: target.textAlign, alpha: target.globalAlpha }) : key in target ? target[key] : () => {}),
+    get: (target, key) => calls[key] ?? (key in target ? target[key] : () => {}),
     set: (target, key, value) => ((target[key] = value), true),
   });
-  return { ctx, texts };
+  return { ctx, texts, shapes };
 }
 
 const theme = { name: "Night", background: "#000", shade: "#111", text: "#fff", muted: "#999", accent: "#0f0", onAccent: "#000" };
@@ -21,20 +29,24 @@ test("the credit is on every frame, from the first to the last", () => {
   for (const time of [0, 15, 30]) {
     const { ctx, texts } = recordingContext();
     credit(ctx, frame(time));
-    assert.equal(texts.length, 1);
-    assert.equal(texts[0].text, "made with drk.vc/soundbite");
+    assert.equal(texts.map((item) => item.text).join(" "), "made with drk.vc/soundbite");
   }
 });
 
-test("the credit sits small in the top right corner, inside the margin above everything else", () => {
+test("the credit is a small label in the top right corner, inside the margin above everything else", () => {
   for (const [width, height] of [[1080, 1080], [1080, 1350], [1920, 1080]]) {
-    const { ctx, texts } = recordingContext();
+    const { ctx, texts, shapes } = recordingContext();
     credit(ctx, frame(5, width, height));
     const pad = Math.round(Math.min(width, height) * 0.074);
-    assert.equal(texts[0].align, "right");
-    assert.equal(texts[0].x, width - pad);
-    assert.ok(texts[0].y > 0 && texts[0].y < pad, `y ${texts[0].y} in the top margin of ${pad}`);
-    assert.ok(/\b(\d+)px/.test(ctx.font) && Number(ctx.font.match(/(\d+)px/)[1]) <= 26, ctx.font);
+    assert.equal(shapes.length, 1, "one label behind the words");
+    const [label] = shapes;
+    assert.ok(Math.abs(label.x + label.width - (width - pad)) < 0.5, `label ends at the margin, ${label.x + label.width} vs ${width - pad}`);
+    assert.ok(label.y > 0 && label.y + label.height < pad, `label ${label.y}..${label.y + label.height} inside the top margin of ${pad}`);
+    assert.ok(label.radius <= 10 * (Math.min(width, height) / 1080), `corner ${label.radius}`);
+    for (const item of texts) {
+      assert.ok(item.x >= label.x && item.x < label.x + label.width, `"${item.text}" starts inside the label`);
+      assert.ok(Number(item.font.match(/(\d+)px/)[1]) <= 26, item.font);
+    }
   }
 });
 

@@ -44,17 +44,15 @@ export interface Soundbite {
 }
 
 /**
- * Soundbite in `container`: the Audiogram editor with a bar above it that transcribes the picked part on this
- * device and takes the corner credit off for one download after a rewarded ad. Downloads end with the follow and
- * star panel.
+ * Soundbite in `container`: the Audiogram editor, with a key in its captions heading that transcribes the picked part
+ * on this device, and one by its export key that takes the corner credit off for one download after a rewarded ad.
+ * Downloads end with the follow and star panel.
  */
 export function soundbite(container: HTMLElement, { autoTranscribe = true, ...options }: SoundbiteOptions = {}): Soundbite {
   const settings: Config = { ...config, ...options };
   const root = document.createElement("div");
   root.className = "sb";
 
-  const bar = document.createElement("div");
-  bar.className = "sb-bar";
   const transcribeKey = keyButton("sb-transcribe", "Transcribe this part", ICONS.transcribe);
   const meter = document.createElement("div");
   meter.className = "sb-meter";
@@ -66,22 +64,20 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   const percent = document.createElement("span");
   percent.className = "sb-percent";
   percent.setAttribute("aria-hidden", "true");
-  // Without an ad unit the credit comes off for free, and the key says so.
-  const creditKey = keyButton("sb-credit", settings.adUnit ? "Watch a short ad to remove the credit" : "Remove the credit", ICONS.credit);
+  const note = document.createElement("div");
+  note.className = "sb-note";
+  note.append(status, percent, meter);
+  // Without an ad unit the credit comes off for free, and the key says so. The key also puts the credit back.
+  const removeLabel = settings.adUnit ? "Watch a short ad to remove the credit" : "Remove the credit";
+  const creditKey = keyButton("sb-credit", removeLabel, ICONS.credit);
+  // Heard, not seen: the picture itself shows the credit come and go.
   const creditNote = document.createElement("p");
-  creditNote.className = "sb-credit-note";
+  creditNote.className = "sb-heard";
   creditNote.setAttribute("role", "status");
-  const work = document.createElement("div");
-  work.className = "sb-transcript";
-  work.append(transcribeKey, status, percent, meter);
-  const clean = document.createElement("div");
-  clean.className = "sb-clean";
-  clean.append(creditNote, creditKey);
-  bar.append(work, clean);
 
   const stage = document.createElement("div");
   stage.className = "sb-editor";
-  root.append(bar, stage);
+  root.append(stage);
   container.append(root);
 
   const say = (text: string, tone: "" | "busy" | "done" | "warn" = "") => {
@@ -100,18 +96,16 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   let savedTimer = 0;
   const shrunk = new WeakMap<Blob, Promise<string>>();
 
-  // Each picture is kept small: the cover as a 256 px square, a background up to 1280 px, a logo up to 256 px with
-  // its transparency.
+  // Each picture is kept small: the cover as a 256 px square, a background up to 1280 px.
   const shrinkers = {
     cover: (blob: Blob) => shrinkCover(blob),
     background: (blob: Blob) => fitPicture(blob, 1280, "image/jpeg"),
-    logo: (blob: Blob) => fitPicture(blob, 256, "image/png"),
   };
 
   async function keep(next: Settings) {
-    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume };
+    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume };
     if (typeof next.theme === "number") entry.theme = next.theme;
-    for (const field of ["cover", "background", "logo"] as const) {
+    for (const field of ["cover", "background"] as const) {
       const picture = next[field];
       if (picture instanceof Blob) {
         if (!shrunk.has(picture)) shrunk.set(picture, shrinkers[field](picture));
@@ -145,6 +139,9 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       showThanks(root, settings);
     },
   });
+  editor.slots.captions.append(transcribeKey);
+  editor.slots.note.append(note);
+  editor.slots.timeline.append(creditKey, creditNote);
 
   // Transcription.
 
@@ -160,7 +157,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   });
 
   const ready = () => editor.element.dataset.state === "ready";
-  // What the bar says when nothing is running: only what is true of the picked part right now.
+  // What the status says when nothing is running: only what is true of the picked part right now.
   const idle = () => {
     const [start, end] = editor.range;
     const part = `${clock(start)} to ${clock(end)}`;
@@ -243,34 +240,44 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     creditOn = on;
     editor.setOverlay(on ? credit : null);
     root.toggleAttribute("data-clean", !on);
-    creditKey.disabled = !on;
-    creditNote.textContent = on ? "Clips carry a small made-with credit" : "Your next download has no credit";
+    creditKey.setAttribute("aria-pressed", String(!on));
+    creditKey.setAttribute("aria-label", on ? removeLabel : "Put the credit back");
+    creditKey.title = on ? removeLabel : "The next download has no credit. Press to put it back";
     lockCredit();
   }
 
-  // The key works only while the credit is on, no ad is loading, and no video is being made from the current look.
+  // The key rests while an ad loads and while a video is made from the current look.
   let adLoading = false;
   function lockCredit() {
-    creditKey.disabled = !creditOn || adLoading || editor.element.dataset.state === "exporting";
+    creditKey.disabled = adLoading || editor.element.dataset.state === "exporting";
   }
 
-  async function removeCredit() {
+  async function toggleCredit() {
+    if (!creditOn) {
+      setCredit(true);
+      creditNote.textContent = "The credit is back";
+      return;
+    }
     adLoading = true;
     lockCredit();
     if (settings.adUnit) creditNote.textContent = "Loading a short ad";
     const result = await watchAd(settings.adUnit);
     adLoading = false;
-    if (result === "granted") return setCredit(false);
+    if (result === "granted") {
+      setCredit(false);
+      creditNote.textContent = "Your next download has no credit";
+      return;
+    }
     setCredit(true);
-    creditNote.textContent = result === "closed"
+    say(result === "closed"
       ? "The ad closed early, so the credit stays"
-      : "Couldn't load an ad, so the credit stays. An ad blocker can stop it";
+      : "Couldn't load an ad, so the credit stays. An ad blocker can stop it", "warn");
   }
 
   transcribeKey.addEventListener("click", () => void transcribe());
-  creditKey.addEventListener("click", () => void removeCredit());
+  creditKey.addEventListener("click", () => void toggleCredit());
 
-  // The bar follows the editor: what can be transcribed changes as a recording loads and the range moves.
+  // The keys follow the editor: what can be transcribed changes as a recording loads and the range moves.
   // A recording that has just opened is transcribed straight away, once; the key does it again for another part.
   let opened: string | Blob | null = null;
   const watcher = new MutationObserver(() => {

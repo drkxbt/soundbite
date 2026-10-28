@@ -1,5 +1,5 @@
-/* Soundbite: Audiogram's editor in drk.vc's dark world, with the transcribe and credit bar above it. Every colour is a
-   custom property, so a host page can retheme it from outside. */
+/* Soundbite: Audiogram's editor in drk.vc's dark world, its transcribe key in the captions heading and its credit key
+   by the export. Every colour is a custom property, so a host page can retheme it from outside. */
 .sb {
   --sb-ground: #0c0c0d;
   --sb-panel: #121214;
@@ -23,7 +23,7 @@
   line-height: 1.4;
   color-scheme: dark;
 }
-/* Audiogram sets its own colours on .ag, so the dark ones go there too; the bar outside it reads the same names. */
+/* Audiogram sets its own colours on .ag, so the dark ones go there too. */
 .sb, .sb .ag {
   --ag-bg: var(--sb-panel);
   --ag-surface: var(--sb-raised);
@@ -39,37 +39,27 @@
 .sb svg .fill { fill: currentColor; stroke: none; }
 .sb ::selection { background: var(--sb-mint-wash); color: var(--sb-text); }
 
-.sb-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
-  padding: 6px 8px 6px 6px;
-  border-radius: 10px;
-  background: var(--sb-panel);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px var(--sb-line), 0 12px 24px -18px rgb(0 0 0 / 0.9);
-}
-.sb-transcript, .sb-clean { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.sb-clean { flex: none; }
-.sb-status, .sb-credit-note { margin: 0; min-width: 0; color: var(--sb-muted); text-wrap: pretty; transition: color 200ms ease; }
+/* The status of the transcript, on its own line under the captions heading: words, a count, and a thin meter. */
+.sb-note { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 6px 10px; margin-top: -6px; font-size: 12.5px; }
+.sb-status { margin: 0; min-width: 0; color: var(--sb-muted); text-wrap: pretty; transition: color 200ms ease; }
 .sb[data-tone="busy"] .sb-status { color: var(--sb-text); font-variant-numeric: tabular-nums; }
 .sb[data-tone="done"] .sb-status { color: var(--sb-mint-text); }
 .sb[data-tone="warn"] .sb-status { color: var(--sb-warn); }
-.sb[data-clean] .sb-credit-note { color: var(--sb-mint-text); }
 .sb-percent { flex: none; color: var(--sb-text); font-variant-numeric: tabular-nums; }
 .sb-percent:empty { display: none; }
+.sb-heard { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* The key action of the bar wears the mint the way Audiogram's export does, but quieter: its icon and a wash. */
+/* The transcribe key wears the mint the way Audiogram's export does, but quieter: its icon and a wash. */
 .sb .sb-transcribe { color: var(--sb-mint-text); background: var(--sb-mint-wash); }
 .sb .sb-transcribe:not(:disabled):hover { background: rgb(47 240 184 / 0.18); color: var(--sb-mint); }
 .sb .sb-transcribe:disabled { color: var(--sb-muted); background: transparent; }
 .sb[data-working] .sb-transcribe { color: var(--sb-text); background: var(--sb-raised); }
 
-/* Progress runs along the bar's bottom edge while the model downloads or listens. */
+/* Progress runs under the status while the model downloads or listens, and takes no room otherwise. */
 .sb-meter {
-  position: absolute;
-  inset: auto 10px 0;
+  position: relative;
+  grid-column: 1 / -1;
+  display: none;
   height: 2px;
   border-radius: 1px;
   background: var(--sb-line);
@@ -86,7 +76,13 @@
   transform: scaleX(var(--done, 0));
   transition: transform 300ms var(--sb-ease);
 }
-.sb[data-working] .sb-meter { opacity: 1; }
+.sb[data-working] .sb-meter { display: block; opacity: 1; }
+@starting-style {
+  .sb[data-working] .sb-meter { opacity: 0; }
+}
+
+/* With the credit off, its key shows it, in the mint of a clean download. */
+.sb .sb-credit[aria-pressed="true"] { color: var(--sb-mint-text); background: var(--sb-mint-wash); box-shadow: none; }
 
 .sb-editor { flex: 1; min-height: 560px; }
 .sb-editor > .ag { height: 100%; }
@@ -173,9 +169,6 @@
 .sb-guide a:focus-visible { outline: 2px solid var(--sb-mint-text); outline-offset: 2px; border-radius: 2px; }
 
 @media (max-width: 640px) {
-  .sb-bar { flex-wrap: wrap; }
-  .sb-transcript { flex: 1 1 100%; }
-  .sb-clean { flex: 1 1 100%; justify-content: space-between; }
   .sb-editor { min-height: 640px; }
   .sb-thanks { inset: auto 16px 16px; width: auto; }
   .sb-guide { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 28px; padding-top: 24px; }

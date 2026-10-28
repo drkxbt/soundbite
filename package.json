@@ -1,8 +1,8 @@
 {
   "name": "soundbite",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "Turn the best minute of a Space or a podcast into a captioned video for X, in the browser: the words are transcribed and timed on your device, and nothing is uploaded.",
+  "description": "Turn the best minute of a Space or a podcast into a captioned video for X, TikTok, Reels, Shorts or LinkedIn, in the browser: the words are transcribed and timed on your device, and nothing is uploaded.",
   "license": "MIT",
   "author": "drk",
   "type": "module",

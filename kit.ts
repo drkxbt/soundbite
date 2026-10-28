@@ -1,11 +1,10 @@
 import type { Layout, Settings, Visual } from "@drkxbt/audiogram";
 
 /** The look a user keeps between clips: Audiogram's settings, with each picture shrunk to a data URL. */
-export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layout" | "visual">> & {
+export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layout" | "visual" | "links">> & {
   theme?: number;
   cover?: string;
   background?: string;
-  logo?: string;
   /** The music's level; the music itself is too big to keep and is opened again each visit. */
   musicVolume?: number;
 };
@@ -33,9 +32,13 @@ export function parseKit(raw: string | null): Kit {
   if (Number.isInteger(value.theme) && (value.theme as number) >= 0) kit.theme = value.theme as number;
   const level = value.musicVolume;
   if (typeof level === "number" && level >= 0 && level <= 1) kit.musicVolume = level;
-  for (const field of ["cover", "background", "logo"] as const) {
+  for (const field of ["cover", "background"] as const) {
     const picture = value[field];
     if (typeof picture === "string" && picture.startsWith("data:image/")) kit[field] = picture;
+  }
+  if (Array.isArray(value.links)) {
+    const links = value.links.filter((link): link is string => typeof link === "string" && link.length <= 80).slice(0, 3);
+    if (links.length) kit.links = links;
   }
   return kit;
 }
@@ -70,8 +73,8 @@ export async function shrinkCover(blob: Blob, size = 256): Promise<string> {
 }
 
 /**
- * A picture shrunk to fit `size` pixels on its longer side, its shape kept, as a data URL: a JPEG for a background,
- * a PNG for a logo so its transparency survives.
+ * A picture shrunk to fit `size` pixels on its longer side, its shape kept, as a data URL: a JPEG for a photo, a PNG
+ * where transparency has to survive.
  */
 export async function fitPicture(blob: Blob, size: number, type: "image/jpeg" | "image/png"): Promise<string> {
   const image = await createImageBitmap(blob);
