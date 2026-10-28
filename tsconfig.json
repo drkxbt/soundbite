@@ -24,6 +24,9 @@
     "cues.ts",
     "transcribe.ts",
     "transcribe-worker.ts",
-    "kit.ts"
+    "kit.ts",
+    "credit.ts",
+    "ads.ts",
+    "config.ts"
   ]
 }
