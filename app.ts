@@ -137,7 +137,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   async function keep(next: Settings) {
     // The pictures as they are now, not as they were when this save was asked for.
     if (picturesBack) void savePictures(editor.settings.images);
-    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers };
+    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers, page: next.page };
     if (typeof next.theme === "number") entry.theme = next.theme;
     for (const field of ["cover", "background"] as const) {
       const picture = next[field];
@@ -149,8 +149,16 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     saveKit(entry);
   }
 
+  // A recording brings only its sound: the picture starts as a white page to build on. A kit from before pages had a
+  // colour keeps the look it had, the classic card on the theme's colours, when the user made a layout or chose a
+  // background picture; otherwise it starts white too.
+  const legacy = kit.page === undefined;
+  const blank = !legacy || (!kit.layers && !kit.background);
   const editor = audiogram(stage, {
     ...kit,
+    blank,
+    page: legacy ? (blank ? undefined : null) : kit.page,
+    theme: legacy && blank ? undefined : kit.theme,
     overlay: credit,
     onChange: (next) => {
       clearTimeout(savedTimer);

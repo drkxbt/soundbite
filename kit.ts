@@ -1,4 +1,4 @@
-import type { Layer, Layout, Settings, Visual } from "@drkxbt/audiogram";
+import type { Layer, Layout, Page, Settings, Visual } from "@drkxbt/audiogram";
 
 /** The look a user keeps between clips: Audiogram's settings, with each picture shrunk to a data URL. */
 export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layout" | "visual" | "links">> & {
@@ -9,10 +9,30 @@ export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layou
   musicVolume?: number;
   /** The layout the user made for each shape they changed; their uploaded pictures are kept apart, by key. */
   layers?: Partial<Record<Layout, Layer[]>>;
+  /** The page's own colour, or null for the theme's; missing in a kit from before pages had one. */
+  page?: Page | null;
 };
 
-const KINDS = new Set(["avatar", "name", "handle", "title", "visual", "time", "captions", "links", "text", "image", "shape"]);
+const KINDS = new Set(["avatar", "name", "handle", "title", "visual", "time", "captions", "links", "text", "image", "video", "shape"]);
+const SHAPES = ["rect", "ellipse", "triangle", "star", "heart", "arrow", "diamond", "bubble"];
+const ENTRANCES = ["fade", "rise", "pop", "slide", "typewriter"];
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const VISUALS: Visual[] = ["bars", "wave", "pulse"];
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
+
+/** A page colour from storage: a hex colour, with a gradient's second colour and angle when they are sound. */
+function parsePage(value: unknown): Page | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const v = value as Record<string, unknown>;
+  if (typeof v.color !== "string" || !HEX.test(v.color)) return undefined;
+  const page: Page = { color: v.color };
+  if (typeof v.to === "string" && HEX.test(v.to) && typeof v.angle === "number" && v.angle >= 0 && v.angle <= 360) {
+    page.to = v.to;
+    page.angle = v.angle;
+  }
+  return page;
+}
 
 /** One layer from storage, its fields of the right kind and in range, or null when it can't be one. */
 function parseLayer(value: unknown): Layer | null {
@@ -26,13 +46,11 @@ function parseLayer(value: unknown): Layer | null {
   if (w <= 0 || h <= 0 || w > 4 || h > 4 || Math.abs(x) > 4 || Math.abs(y) > 4) return null;
   const layer: Record<string, unknown> = { id: v.id.slice(0, 80), kind: v.kind, x, y, w, h, rotation: number("rotation") ?? 0, opacity: clamp(number("opacity") ?? 1, 0, 1) };
   const put = (key: string, found: unknown) => found !== undefined && (layer[key] = found);
-  put("hidden", typeof v.hidden === "boolean" ? v.hidden : undefined);
-  put("locked", typeof v.locked === "boolean" ? v.locked : undefined);
-  put("italic", typeof v.italic === "boolean" ? v.italic : undefined);
+  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
   put("text", text("text", 2000));
   put("font", text("font", 80));
   put("image", text("image", 80));
-  for (const key of ["color", "highlight", "fill"]) put(key, text(key, 40));
+  for (const key of ["color", "highlight", "fill", "outline", "background"]) put(key, text(key, 40));
   const size = number("size");
   put("size", size === undefined ? undefined : clamp(size, 8, 400));
   const weight = number("weight");
@@ -40,13 +58,27 @@ function parseLayer(value: unknown): Layer | null {
   const radius = number("radius");
   put("radius", radius === undefined ? undefined : clamp(radius, 0, 0.5));
   put("align", ["left", "center", "right"].includes(v.align as string) ? v.align : undefined);
-  put("shape", ["rect", "ellipse"].includes(v.shape as string) ? v.shape : undefined);
+  put("shape", SHAPES.includes(v.shape as string) ? v.shape : undefined);
+  put("visual", VISUALS.includes(v.visual as Visual) ? v.visual : undefined);
+  put("enter", ENTRANCES.includes(v.enter as string) ? v.enter : undefined);
+  for (const key of ["from", "until"]) {
+    const seconds = number(key);
+    put(key, seconds === undefined ? undefined : clamp(seconds, 0, 1e6));
+  }
+  if (v.adjust && typeof v.adjust === "object" && !Array.isArray(v.adjust)) {
+    const tone = v.adjust as Record<string, unknown>;
+    const adjust: Record<string, number> = {};
+    for (const [key, high] of [["brightness", 2], ["contrast", 2], ["saturation", 2], ["blur", 20]] as const) {
+      const value = tone[key];
+      if (typeof value === "number" && Number.isFinite(value)) adjust[key] = clamp(value, 0, high);
+    }
+    put("adjust", Object.keys(adjust).length ? adjust : undefined);
+  }
   return layer as unknown as Layer;
 }
 
 const KEY = "soundbite:kit";
 const LAYOUTS: Layout[] = ["square", "portrait", "story", "landscape"];
-const VISUALS: Visual[] = ["bars", "wave", "pulse"];
 
 /** A saved kit, keeping only fields of the right kind. Anything unreadable is an empty kit; it never throws. */
 export function parseKit(raw: string | null): Kit {
@@ -83,6 +115,8 @@ export function parseKit(raw: string | null): Kit {
     }
     if (Object.keys(layers).length) kit.layers = layers;
   }
+  const page = parsePage(value.page);
+  if (page !== undefined) kit.page = page;
   return kit;
 }
 

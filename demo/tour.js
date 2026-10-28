@@ -52,7 +52,7 @@ export async function run(app) {
     root.removeAttribute("data-clean");
     $(".sb-credit").disabled = false;
     $(".sb-credit-note").textContent = "Clips carry a small made-with credit";
-    $(".sb-thanks")?.hidePopover?.();
+    $(".sb-thanks")?.close?.();
     status("Captions for 0:00 to 0:30, written on this device", "", null);
   }
 

@@ -127,37 +127,51 @@
   .sb .sb-credit { flex: 1; justify-content: center; }
 }
 
-/* After a download: a small card in the corner, in the top layer, never in the way. */
+/* After a download: a card in the middle of the screen, five stars landing one after another over its thanks. */
 .sb-thanks {
-  position: fixed;
-  inset: auto 16px 16px auto;
-  width: min(340px, calc(100vw - 32px));
-  margin: 0;
-  padding: 14px 12px 12px 14px;
+  width: min(380px, calc(100vw - 32px));
+  max-width: none;
+  padding: 0;
   border: 0;
   border-radius: 10px;
   background: var(--sb-raised);
   color: var(--sb-text);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 12px rgb(0 0 0 / 0.45), 0 32px 64px -24px rgb(0 0 0 / 0.95);
   font: inherit;
-  opacity: 1;
-  transform: none;
-  transition: opacity 200ms var(--sb-ease), transform 200ms var(--sb-ease), overlay 200ms allow-discrete, display 200ms allow-discrete;
 }
-.sb-thanks:not(:popover-open) { opacity: 0; transform: translateY(4px); }
-@starting-style {
-  .sb-thanks:popover-open { opacity: 0; transform: translateY(10px) scale(0.98); }
-}
-.sb-thanks { display: none; }
-.sb-thanks:popover-open { display: grid; gap: 12px; }
-/* The card itself takes focus only to be found; its keys carry the visible focus rings. */
+.sb-thanks::backdrop { background: rgb(0 0 0 / 0.6); }
+.sb-thanks[open] { animation: sb-thanks-in 260ms var(--sb-ease); }
+.sb-thanks[open]::backdrop { animation: sb-fade-in 200ms ease-out; }
 .sb-thanks:focus { outline: none; }
-.sb-thanks-text p { margin: 0; color: var(--sb-muted); text-wrap: pretty; }
-.sb-thanks-text .sb-thanks-title { margin-bottom: 4px; color: var(--sb-text); font-size: 14.5px; font-weight: 600; text-wrap: balance; }
-.sb-thanks-keys { display: flex; gap: 6px; }
-.sb-thanks-keys .sb-close { margin-left: auto; }
-.sb-thanks .sb-follow, .sb-thanks .sb-star { background: var(--sb-panel); color: var(--sb-text); box-shadow: 0 0 0 1px var(--sb-line); }
-.sb-thanks .sb-star:hover { color: #f5c451; }
+@keyframes sb-thanks-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } }
+@keyframes sb-fade-in { from { opacity: 0; } }
+.sb-thanks-card { position: relative; display: grid; justify-items: center; gap: 8px; padding: 30px 24px 22px; text-align: center; }
+.sb-thanks-stars { display: flex; gap: 6px; margin-bottom: 8px; }
+.sb-thanks-stars span { position: relative; display: block; width: 34px; height: 34px; color: #f5c451; animation: sb-star-land 560ms cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: calc(140ms + var(--i) * 90ms); }
+.sb-thanks-stars svg { display: block; width: 100%; height: 100%; fill: currentColor; stroke: none; filter: drop-shadow(0 2px 8px rgb(245 196 81 / 0.35)); }
+.sb-thanks-stars i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: #f5c451; opacity: 0; animation: sb-spark 640ms cubic-bezier(0.23, 1, 0.32, 1) both; animation-delay: calc(360ms + var(--i) * 90ms); }
+@keyframes sb-star-land {
+  from { opacity: 0; transform: translateY(6px) scale(0.2) rotate(-50deg); }
+  50% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sb-spark {
+  0% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+}
+.sb-thanks-title { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
+.sb-thanks-text { max-width: 32ch; margin: 0; color: var(--sb-muted); text-wrap: pretty; }
+.sb-thanks-keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; margin-top: 12px; }
+.sb-thanks-keys .ag-key { justify-content: center; height: 38px; text-decoration: none; }
+.sb-thanks .sb-follow { background: var(--sb-text); color: var(--sb-panel); }
+.sb-thanks .sb-star { background: var(--sb-panel); color: var(--sb-text); box-shadow: 0 0 0 1px var(--sb-line); }
+.sb-thanks .sb-star svg { fill: #f5c451; stroke: none; }
+@media (hover: hover) {
+  .sb-thanks .sb-follow:hover { background: #ffffff; }
+  .sb-thanks .sb-star:hover { box-shadow: 0 0 0 1px rgb(245 196 81 / 0.5); }
+}
+.sb-thanks .sb-close { position: absolute; top: 10px; right: 10px; background: none; color: var(--sb-muted); }
+.sb-thanks .sb-close:hover { color: var(--sb-text); }
 
 /* How to use: a short guide under the app, the steps first and the fine print beside them. */
 .sb-guide {
@@ -210,10 +224,10 @@
 
 @media (max-width: 640px) {
   .sb-editor { min-height: 0; }
-  .sb-thanks { inset: auto 16px 16px; width: auto; }
   .sb-guide { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 28px; padding-top: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sb-thanks, .sb-meter::after, .sb-credit-note { transition: none; }
+  .sb-meter::after, .sb-credit-note { transition: none; }
+  .sb-thanks[open], .sb-thanks[open]::backdrop, .sb-thanks-stars span, .sb-thanks-stars i { animation: none; }
 }

@@ -11,7 +11,8 @@ function recordingContext() {
   const state = { textAlign: "start", textBaseline: "alphabetic", fillStyle: "#000", font: "", globalAlpha: 1 };
   const size = () => Number(state.font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? 10);
   const calls = {
-    fillText: (text, x, y) => texts.push({ text, x, y, align: state.textAlign, font: state.font }),
+    fillText: (text, x, y) => texts.push({ text, x, y, align: state.textAlign, font: state.font, fill: state.fillStyle }),
+    fill: () => shapes.length && (shapes[shapes.length - 1].fill ??= state.fillStyle),
     measureText: (text) => ({ width: text.length * size() * 0.5 }),
     roundRect: (x, y, width, height, radius) => shapes.push({ x, y, width, height, radius }),
   };
@@ -66,4 +67,16 @@ test("an ad tag that never loads gives up instead of waiting for ever", async ()
     delete globalThis.window;
     delete globalThis.document;
   }
+});
+
+test("the credit reads on any page: its own dark label and light words, whatever the theme and the picture behind", () => {
+  const paper = { name: "Paper", background: "#f5f4f0", shade: "#e6e3da", text: "#121212", muted: "#6a6b6f", accent: "#121212", onAccent: "#f5f4f0" };
+  const looks = [theme, paper].map((each) => {
+    const { ctx, texts, shapes } = recordingContext();
+    credit(ctx, { ...frame(1), theme: each });
+    return { label: shapes[0].fill, words: texts.map((item) => item.fill) };
+  });
+  assert.deepEqual(looks[0], looks[1], "the same colours under a dark and a light theme");
+  assert.match(looks[0].label, /^rgba\(1[0-9], 1[0-9], 1[0-9], 0\.[6-9]/, "a dark label");
+  assert.ok(looks[0].words.every((fill) => /^#f|^rgba\(255/.test(fill)), `light words, ${looks[0].words}`);
 });

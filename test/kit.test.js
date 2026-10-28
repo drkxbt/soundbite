@@ -64,3 +64,30 @@ test("a layer with numbers that aren't numbers, or out of their range, is droppe
   assert.equal(kept.size, 400);
   assert.equal(kept.text.length, 2000);
 });
+
+test("a layer's look, its flips and tone, its way in and its times are kept, each checked", () => {
+  const good = {
+    id: "v-1", kind: "video", image: "picture-1", x: 0, y: 0, w: 1, h: 1, rotation: 0, opacity: 1,
+    flipX: true, adjust: { brightness: 1.2, contrast: 0.9, saturation: 0, blur: 4 }, enter: "pop", from: 2.5, until: 9,
+  };
+  const words = { id: "t", kind: "text", text: "Hi", x: 0.1, y: 0.1, w: 0.5, h: 0.1, rotation: 0, opacity: 1, shadow: true, outline: "#000000", background: "#ffd84d", uppercase: true, enter: "typewriter" };
+  const sound = { id: "s", kind: "visual", visual: "pulse", x: 0.1, y: 0.5, w: 0.8, h: 0.2, rotation: 0, opacity: 1 };
+  const star = { id: "st", kind: "shape", shape: "star", fill: "#ff0000", x: 0.3, y: 0.3, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
+  assert.deepEqual(parseKit(JSON.stringify({ layers: { square: [good, words, sound, star] } })).layers.square, [good, words, sound, star]);
+  const bad = parseKit(JSON.stringify({ layers: { square: [{ ...good, enter: "explode", from: -3, until: "soon", adjust: { brightness: 9, blur: "x" }, visual: "lasers", shape: "blob", flipY: "yes" }] } })).layers.square[0];
+  assert.equal(bad.enter, undefined);
+  assert.equal(bad.from, 0);
+  assert.equal(bad.until, undefined);
+  assert.deepEqual(bad.adjust, { brightness: 2 });
+  assert.equal(bad.visual, undefined);
+  assert.equal(bad.shape, undefined);
+  assert.equal(bad.flipY, undefined);
+});
+
+test("the page's colour is kept as colours, a gradient with its angle, or none for the theme's", () => {
+  assert.deepEqual(parseKit(JSON.stringify({ page: { color: "#ffffff" } })), { page: { color: "#ffffff" } });
+  assert.deepEqual(parseKit(JSON.stringify({ page: { color: "#ff9a8b", to: "#ffd86f", angle: 135 } })), { page: { color: "#ff9a8b", to: "#ffd86f", angle: 135 } });
+  assert.deepEqual(parseKit(JSON.stringify({ page: null })), { page: null });
+  assert.deepEqual(parseKit(JSON.stringify({ page: { color: "url(javascript:1)" } })), {});
+  assert.deepEqual(parseKit(JSON.stringify({ page: { color: "#fff", to: "red", angle: 900 } })), { page: { color: "#fff" } });
+});
