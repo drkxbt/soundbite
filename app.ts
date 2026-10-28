@@ -135,7 +135,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   let picturesBack = false;
 
   async function keep(next: Settings) {
-    if (picturesBack) void savePictures(next.images);
+    // The pictures as they are now, not as they were when this save was asked for.
+    if (picturesBack) void savePictures(editor.settings.images);
     const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers };
     if (typeof next.theme === "number") entry.theme = next.theme;
     for (const field of ["cover", "background"] as const) {
