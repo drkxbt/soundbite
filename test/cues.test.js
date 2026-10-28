@@ -27,6 +27,11 @@ test("a sentence stays whole up to 84 characters, since Audiogram pages long cap
   for (const cue of long) assert.ok(cue.text.length <= 84, cue.text);
 });
 
+test("no word runs past the end of the audio it was heard in", () => {
+  const chunks = [{ text: " comes", timestamp: [1.5, 1.9] }, { text: " from.", timestamp: [1.98, 8.66] }];
+  assert.deepEqual(toWords(chunks, 30, 3.16).map((word) => word.end), [31.9, 33.16]);
+});
+
 test("words group into captions that break at a chosen length", () => {
   const cues = wordsToCues(words("one two three four five six seven eight nine ten eleven twelve"), { maxChars: 42 });
   assert.ok(cues.length >= 2);

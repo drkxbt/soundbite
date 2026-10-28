@@ -9,14 +9,17 @@ export interface Chunk {
 // Whisper times words to a fiftieth of a second; milliseconds keep the sums from drifting.
 const ms = (seconds: number) => Math.round(seconds * 1000) / 1000;
 
-/** Whisper's chunks as words in recording time: `offset` is where the transcribed audio starts in the recording. */
-export function toWords(chunks: Chunk[], offset: number): Word[] {
+/**
+ * Whisper's chunks as words in recording time: `offset` is where the transcribed audio starts in the recording and
+ * `length` how long it lasts, since Whisper can stretch the last word to the end of its 30 second window.
+ */
+export function toWords(chunks: Chunk[], offset: number, length = Infinity): Word[] {
   const spoken = chunks
     .map((chunk) => ({ text: chunk.text.trim(), start: chunk.timestamp[0], end: chunk.timestamp[1] }))
     .filter((chunk) => chunk.text);
   return spoken.map((chunk, index) => {
     // The last word of a window can come back with no end; it lasts until the next word, or a short beat.
-    const end = chunk.end ?? spoken[index + 1]?.start ?? chunk.start + 0.3;
+    const end = Math.min(chunk.end ?? spoken[index + 1]?.start ?? chunk.start + 0.3, length);
     return { text: chunk.text, start: ms(chunk.start + offset), end: ms(end + offset) };
   });
 }

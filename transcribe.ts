@@ -1,4 +1,5 @@
 import type { Word } from "@drkxbt/audiogram";
+import { SPEECH_RATE } from "./audio.js";
 import { toWords } from "./cues.js";
 import type { WorkerMessage } from "./transcribe-worker.js";
 
@@ -20,7 +21,7 @@ export interface Transcriber {
  */
 export function createTranscriber({ onProgress }: { onProgress?: (progress: Progress) => void } = {}): Transcriber {
   let worker: Worker | null = null;
-  let pending: { resolve(words: Word[]): void; reject(error: Error): void; offset: number } | null = null;
+  let pending: { resolve(words: Word[]): void; reject(error: Error): void; offset: number; length: number } | null = null;
 
   const fail = (error: Error) => {
     pending?.reject(error);
@@ -33,7 +34,7 @@ export function createTranscriber({ onProgress }: { onProgress?: (progress: Prog
       const message = event.data;
       if (message.type === "progress") onProgress?.({ stage: message.stage, percent: message.percent });
       else if (message.type === "done") {
-        pending?.resolve(toWords(message.chunks, pending.offset));
+        pending?.resolve(toWords(message.chunks, pending.offset, pending.length));
         pending = null;
       } else {
         const error = new Error(message.message);
@@ -54,7 +55,7 @@ export function createTranscriber({ onProgress }: { onProgress?: (progress: Prog
       if (pending) return Promise.reject(new Error("A transcription is already running"));
       worker ??= start();
       return new Promise<Word[]>((resolve, reject) => {
-        pending = { resolve, reject, offset };
+        pending = { resolve, reject, offset, length: samples.length / SPEECH_RATE };
         worker!.postMessage({ samples }, [samples.buffer]);
       });
     },
