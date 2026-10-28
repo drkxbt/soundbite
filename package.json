@@ -1,0 +1,21 @@
+{
+  "name": "soundbite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn the best minute of a Space or a podcast into a captioned video for X, in the browser: the words are transcribed and timed on your device, and nothing is uploaded.",
+  "license": "MIT",
+  "author": "drk",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "@drkxbt/audiogram": "github:drkxbt/audiogram",
+    "@huggingface/transformers": "4.3.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": ">=5.4"
+  }
+}

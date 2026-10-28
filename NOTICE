@@ -1,0 +1,11 @@
+soundbite
+Copyright 2026 drk
+
+Licensed under the MIT License. See LICENSE.
+
+Soundbite builds on Audiogram (github.com/drkxbt/audiogram, MIT) for the editor and the video, and on
+transformers.js (Hugging Face, Apache-2.0) with ONNX Runtime Web (Microsoft, MIT) for speech recognition. The speech
+model, Whisper by OpenAI (MIT), converted to ONNX by the onnx-community, is downloaded from Hugging Face when it is
+first needed and is not part of this repository.
+
+X is named only to say what the clips are for; X Corp. has no connection with this project.
