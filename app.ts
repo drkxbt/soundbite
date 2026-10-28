@@ -33,6 +33,11 @@ function relabel(button: HTMLButtonElement, label: string, icon: string) {
   button.innerHTML = svg(icon);
 }
 
+export interface SoundbiteOptions extends Partial<Config> {
+  /** Transcribe the picked part as soon as a recording opens. On by default; the recording tour turns it off. */
+  autoTranscribe?: boolean;
+}
+
 export interface Soundbite {
   readonly editor: Editor;
   destroy(): void;
@@ -43,7 +48,7 @@ export interface Soundbite {
  * device and takes the corner credit off for one download after a rewarded ad. Downloads end with the follow and
  * star panel.
  */
-export function soundbite(container: HTMLElement, options: Partial<Config> = {}): Soundbite {
+export function soundbite(container: HTMLElement, { autoTranscribe = true, ...options }: SoundbiteOptions = {}): Soundbite {
   const settings: Config = { ...config, ...options };
   const root = document.createElement("div");
   root.className = "sb";
@@ -134,9 +139,13 @@ export function soundbite(container: HTMLElement, options: Partial<Config> = {})
   });
 
   const ready = () => editor.element.dataset.state === "ready";
+  // What the bar says when nothing is running: only what is true of the picked part right now.
   const idle = () => {
     const [start, end] = editor.range;
-    say(ready() ? `Captions for ${clock(start)} to ${clock(end)}, written on this device` : "Open a recording, then pick the part to share");
+    const part = `${clock(start)} to ${clock(end)}`;
+    if (!ready()) say("Open a recording, then pick the part to share");
+    else if (editor.captions.some((cue) => cue.end > start && cue.start < end)) say(`Captions for ${part}. Fix any word in the list on the right`, "done");
+    else say(`No captions yet for ${part}`);
   };
 
   async function transcribe() {
@@ -200,9 +209,15 @@ export function soundbite(container: HTMLElement, options: Partial<Config> = {})
   creditKey.addEventListener("click", () => void removeCredit());
 
   // The bar follows the editor: what can be transcribed changes as a recording loads and the range moves.
+  // A recording that has just opened is transcribed straight away, once; the key does it again for another part.
+  let transcribed: string | Blob | null = null;
   const watcher = new MutationObserver(() => {
     transcribeKey.disabled = !ready() && !busy;
-    if (!busy && !root.dataset.tone) idle();
+    if (!busy && root.dataset.tone !== "warn") idle();
+    if (autoTranscribe && ready() && !busy && editor.source && editor.source !== transcribed) {
+      transcribed = editor.source;
+      void transcribe();
+    }
   });
   watcher.observe(editor.element, { attributes: true, attributeFilter: ["data-state"] });
   editor.element.addEventListener("pointerup", () => !busy && root.dataset.tone !== "warn" && idle());
