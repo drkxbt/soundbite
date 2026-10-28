@@ -1,0 +1,132 @@
+/* Soundbite: Audiogram's editor in drk.vc's dark world, with the transcribe and credit bar above it. Every colour is a
+   custom property, so a host page can retheme it from outside. */
+.sb {
+  --sb-ground: #0c0c0d;
+  --sb-panel: #121214;
+  --sb-raised: #17171a;
+  --sb-text: #f2f2f0;
+  --sb-muted: #8b8b88;
+  --sb-line: rgb(255 255 255 / 0.08);
+  --sb-mint: #2ff0b8;
+  --sb-mint-text: #4ff3c4;
+  --sb-mint-wash: rgb(47 240 184 / 0.12);
+  --sb-warn: #ff8f7f;
+  --sb-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  color: var(--sb-text);
+  font-family: var(--sb-font, "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+  font-size: 13.5px;
+  line-height: 1.4;
+  color-scheme: dark;
+}
+/* Audiogram sets its own colours on .ag, so the dark ones go there too; the bar outside it reads the same names. */
+.sb, .sb .ag {
+  --ag-bg: var(--sb-panel);
+  --ag-surface: var(--sb-raised);
+  --ag-field: #1e1e22;
+  --ag-text: var(--sb-text);
+  --ag-muted: var(--sb-muted);
+  --ag-line: var(--sb-line);
+  --ag-edge: rgb(255 255 255 / 0.14);
+  --ag-wave: rgb(255 255 255 / 0.22);
+  --ag-wave-in: var(--sb-text);
+  --ag-stage: var(--sb-ground);
+}
+.sb svg .fill { fill: currentColor; stroke: none; }
+.sb ::selection { background: var(--sb-mint-wash); color: var(--sb-text); }
+
+.sb-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 10px;
+  background: var(--sb-panel);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px var(--sb-line), 0 12px 24px -18px rgb(0 0 0 / 0.9);
+}
+.sb-transcript, .sb-clean { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sb-clean { flex: none; }
+.sb-status, .sb-credit-note { margin: 0; min-width: 0; color: var(--sb-muted); text-wrap: pretty; transition: color 200ms ease; }
+.sb[data-tone="busy"] .sb-status { color: var(--sb-text); font-variant-numeric: tabular-nums; }
+.sb[data-tone="done"] .sb-status { color: var(--sb-mint-text); }
+.sb[data-tone="warn"] .sb-status { color: var(--sb-warn); }
+.sb[data-clean] .sb-credit-note { color: var(--sb-mint-text); }
+
+/* The key action of the bar wears the mint the way Audiogram's export does, but quieter: its icon and a wash. */
+.sb .sb-transcribe { color: var(--sb-mint-text); background: var(--sb-mint-wash); }
+.sb .sb-transcribe:not(:disabled):hover { background: rgb(47 240 184 / 0.18); color: var(--sb-mint); }
+.sb .sb-transcribe:disabled { color: var(--sb-muted); background: transparent; }
+.sb[data-working] .sb-transcribe { color: var(--sb-text); background: var(--sb-raised); }
+
+/* Progress runs along the bar's bottom edge while the model downloads or listens. */
+.sb-meter {
+  position: absolute;
+  inset: auto 10px 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sb-line);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.sb-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--sb-mint);
+  transform-origin: left;
+  transform: scaleX(var(--done, 0));
+  transition: transform 300ms var(--sb-ease);
+}
+.sb[data-working] .sb-meter { opacity: 1; }
+
+.sb-editor { flex: 1; min-height: 560px; }
+.sb-editor > .ag { height: 100%; }
+
+/* After a download: a small card in the corner, in the top layer, never in the way. */
+.sb-thanks {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  width: min(340px, calc(100vw - 32px));
+  margin: 0;
+  padding: 14px 12px 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sb-raised);
+  color: var(--sb-text);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 0 0 1px rgb(255 255 255 / 0.1), 0 4px 12px rgb(0 0 0 / 0.45), 0 32px 64px -24px rgb(0 0 0 / 0.95);
+  font: inherit;
+  opacity: 1;
+  transform: none;
+  transition: opacity 200ms var(--sb-ease), transform 200ms var(--sb-ease), overlay 200ms allow-discrete, display 200ms allow-discrete;
+}
+.sb-thanks:not(:popover-open) { opacity: 0; transform: translateY(4px); }
+@starting-style {
+  .sb-thanks:popover-open { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+.sb-thanks { display: none; }
+.sb-thanks:popover-open { display: grid; gap: 12px; }
+.sb-thanks-text p { margin: 0; color: var(--sb-muted); text-wrap: pretty; }
+.sb-thanks-text .sb-thanks-title { margin-bottom: 4px; color: var(--sb-text); font-size: 14.5px; font-weight: 600; text-wrap: balance; }
+.sb-thanks-keys { display: flex; gap: 6px; }
+.sb-thanks-keys .sb-close { margin-left: auto; }
+.sb-thanks .sb-follow, .sb-thanks .sb-star { background: var(--sb-panel); color: var(--sb-text); box-shadow: 0 0 0 1px var(--sb-line); }
+.sb-thanks .sb-star:hover { color: #f5c451; }
+
+@media (max-width: 640px) {
+  .sb-bar { flex-wrap: wrap; }
+  .sb-transcript { flex: 1 1 100%; }
+  .sb-clean { flex: 1 1 100%; justify-content: space-between; }
+  .sb-editor { min-height: 640px; }
+  .sb-thanks { inset: auto 16px 16px; width: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-thanks, .sb-meter::after { transition: none; }
+}

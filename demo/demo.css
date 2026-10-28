@@ -1,0 +1,26 @@
+@font-face { font-family: "Geist"; src: url("fonts/geist.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+:root { color-scheme: dark; background: #0c0c0d; scrollbar-color: rgb(255 255 255 / 0.16) transparent; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #f2f2f0; font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+::selection { background: rgb(47 240 184 / 0.22); }
+
+.page { display: flex; flex-direction: column; gap: 28px; width: min(1180px, 100%); min-height: 100dvh; margin: 0 auto; padding: 20px 24px 32px; }
+.top { display: flex; align-items: center; justify-content: space-between; }
+.name { font-family: "Geist Mono", ui-monospace, monospace; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+.top-key { color: #8b8b88; }
+.top-key:hover { color: #f2f2f0; }
+.intro { max-width: 68ch; }
+.intro h1 { margin: 0 0 10px; font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
+.intro p { margin: 0; color: #b4b4b0; font-size: 15px; line-height: 1.55; text-wrap: pretty; }
+.sample { padding: 0; border: 0; background: none; color: #4ff3c4; font: inherit; text-decoration: underline; text-decoration-color: rgb(79 243 196 / 0.4); text-underline-offset: 3px; cursor: pointer; }
+.sample:hover { text-decoration-color: currentColor; }
+.sample:focus-visible { outline: 2px solid #4ff3c4; outline-offset: 2px; border-radius: 2px; }
+.app { flex: 1; display: flex; min-height: 0; }
+.app > .sb { flex: 1; }
+
+@media (max-width: 640px) {
+  .page { padding: 14px 16px 24px; gap: 20px; }
+  .intro h1 { font-size: 22px; }
+}

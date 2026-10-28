@@ -8,4 +8,10 @@ transformers.js (Hugging Face, Apache-2.0) with ONNX Runtime Web (Microsoft, MIT
 model, Whisper by OpenAI (MIT), converted to ONNX by the onnx-community, is downloaded from Hugging Face when it is
 first needed and is not part of this repository.
 
-X is named only to say what the clips are for; X Corp. has no connection with this project.
+The demo page ships the Geist and Geist Mono typefaces by Vercel, in collaboration with basement.studio, in
+demo/fonts/, under the SIL Open Font License 1.1 (demo/fonts/OFL.txt). The sample in demo/sample is Audiogram's
+made-up exchange read by the Microsoft David and Microsoft Zira text-to-speech voices; it is not a recording of any
+real Space or person.
+
+X is named only to say what the clips are for; X Corp. has no connection with this project. Google Ad Manager serves
+the optional rewarded ad on drk.vc's copy; Google has no connection with this project either.

@@ -19,8 +19,16 @@ test("Whisper's chunks become words in recording time, each with an end", () => 
   ]);
 });
 
-test("words group into captions that break at 42 characters", () => {
-  const cues = wordsToCues(words("one two three four five six seven eight nine ten eleven twelve"));
+test("a sentence stays whole up to 84 characters, since Audiogram pages long captions on screen itself", () => {
+  const line = "Today we're talking about shipping in public.";
+  assert.deepEqual(wordsToCues(words(line)).map((cue) => cue.text), [line]);
+  const long = wordsToCues(words("one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen"));
+  assert.equal(long.length, 2);
+  for (const cue of long) assert.ok(cue.text.length <= 84, cue.text);
+});
+
+test("words group into captions that break at a chosen length", () => {
+  const cues = wordsToCues(words("one two three four five six seven eight nine ten eleven twelve"), { maxChars: 42 });
   assert.ok(cues.length >= 2);
   for (const cue of cues) assert.ok(cue.text.length <= 42, cue.text);
   assert.equal(cues.map((cue) => cue.text).join(" "), "one two three four five six seven eight nine ten eleven twelve");

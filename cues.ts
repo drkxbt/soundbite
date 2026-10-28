@@ -23,9 +23,10 @@ export function toWords(chunks: Chunk[], offset: number): Word[] {
 
 /**
  * Words grouped into captions. A caption ends at a sentence's end, before a pause longer than `maxGap` seconds, or
- * before it would run past `maxChars`.
+ * before it would run past `maxChars`. The limit is loose because Audiogram breaks a long caption into pages that fit
+ * the video's shape; here it only keeps the list of captions easy to edit, without stranding a sentence's last word.
  */
-export function wordsToCues(words: Word[], { maxChars = 42, maxGap = 0.8 } = {}): Cue[] {
+export function wordsToCues(words: Word[], { maxChars = 84, maxGap = 0.8 } = {}): Cue[] {
   const cues: Cue[] = [];
   let group: Word[] = [];
   const close = () => {

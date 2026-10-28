@@ -1,6 +1,6 @@
 // Bundles the app and the speech worker for the browser, with ONNX Runtime's WebAssembly next to them.
 import { build } from "esbuild";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 const out = "dist/app";
 await build({
@@ -18,3 +18,7 @@ await mkdir(`${out}/ort`, { recursive: true });
 for (const file of ["ort-wasm-simd-threaded.asyncify.mjs", "ort-wasm-simd-threaded.asyncify.wasm"]) {
   await copyFile(`node_modules/onnxruntime-web/dist/${file}`, `${out}/ort/${file}`);
 }
+
+// One stylesheet: Audiogram's editor first, then Soundbite's dark theme and bar over it.
+const css = await Promise.all(["node_modules/@drkxbt/audiogram/audiogram.css", "soundbite.css"].map((file) => readFile(file, "utf8")));
+await writeFile(`${out}/soundbite.css`, css.join("\n"));
