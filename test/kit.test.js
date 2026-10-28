@@ -46,3 +46,21 @@ test("the music's level is kept, the music itself is not", () => {
 test("every shape the editor offers is kept, the 9:16 story among them", () => {
   for (const layout of ["square", "portrait", "story", "landscape"]) assert.deepEqual(parseKit(JSON.stringify({ layout })), { layout });
 });
+
+test("a layout the user made is kept per shape, each layer checked field by field", () => {
+  const good = { id: "text-1", kind: "text", text: "Big news", x: 0.1, y: 0.4, w: 0.8, h: 0.1, rotation: 15, opacity: 0.8, font: "Anton", size: 96, weight: 800, color: "#ff3366", align: "center" };
+  const kit = parseKit(JSON.stringify({ layers: { square: [good, { id: "x", kind: "rocket", x: 0, y: 0, w: 1, h: 1 }], cube: [good], story: "nope" } }));
+  assert.deepEqual(Object.keys(kit.layers), ["square"]);
+  assert.deepEqual(kit.layers.square, [good]);
+});
+
+test("a layer with numbers that aren't numbers, or out of their range, is dropped or held in range", () => {
+  const base = { id: "a", kind: "shape", x: 0, y: 0, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
+  const kit = parseKit(JSON.stringify({ layers: { square: [{ ...base, x: "0.5" }, { ...base, id: "b", w: -1 }, { ...base, id: "c", opacity: 7, size: 9000, text: "x".repeat(5000) }] } }));
+  assert.equal(kit.layers.square.length, 1);
+  const [kept] = kit.layers.square;
+  assert.equal(kept.id, "c");
+  assert.equal(kept.opacity, 1);
+  assert.equal(kept.size, 400);
+  assert.equal(kept.text.length, 2000);
+});

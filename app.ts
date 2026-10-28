@@ -5,7 +5,9 @@ import { config, type Config } from "./config.js";
 import { credit } from "./credit.js";
 import { dropHallucinations, mergeCues, wordsToCues } from "./cues.js";
 import { fitPicture, loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
+import type { FontEntry } from "./fonts.js";
 import { showThanks } from "./panel.js";
+import { loadPictures, savePictures } from "./pictures.js";
 import { Coverage, cutPoint, type Span } from "./sweep.js";
 import { createTranscriber, type Progress } from "./transcribe.js";
 
@@ -129,8 +131,12 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     background: (blob: Blob) => fitPicture(blob, 1280, "image/jpeg"),
   };
 
+  // Pictures are kept once the ones from last time are back, so an early change can't let them go.
+  let picturesBack = false;
+
   async function keep(next: Settings) {
-    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume };
+    if (picturesBack) void savePictures(next.images);
+    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers };
     if (typeof next.theme === "number") entry.theme = next.theme;
     for (const field of ["cover", "background"] as const) {
       const picture = next[field];
@@ -166,6 +172,21 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     },
   });
   editor.slots.header.append(captionsControl);
+  // The fonts the build bundled, listed next to the app, each file fetched only when a layer uses it.
+  const fontsAt = new URL("./fonts/", import.meta.url);
+  void fetch(new URL("fonts.json", fontsAt))
+    .then((response) => (response.ok ? (response.json() as Promise<FontEntry[]>) : []))
+    .then((entries) => editor.setFonts(entries.map((entry) => ({
+      name: entry.name,
+      family: entry.family,
+      category: entry.category,
+      files: entry.files.map((file) => ({ url: new URL(file.file, fontsAt).href, weight: file.weight, unicodeRange: file.unicodeRange })),
+    }))))
+    .catch(() => {});
+  void loadPictures().then(async (pictures) => {
+    if (Object.keys(pictures).length) await editor.setImages(pictures);
+    picturesBack = true;
+  });
   editor.slots.actions.append(creditWrap);
   editor.slots.captions.append(redoKey);
 
