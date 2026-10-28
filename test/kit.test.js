@@ -25,3 +25,9 @@ test("a background picture and a logo are kept as pictures, and nothing else in 
   assert.deepEqual(parseKit(JSON.stringify(kit)), kit);
   assert.deepEqual(parseKit(JSON.stringify({ background: "https://example.com/a.jpg", logo: 5 })), {});
 });
+
+test("the music's level is kept, the music itself is not", () => {
+  assert.deepEqual(parseKit(JSON.stringify({ musicVolume: 0.4, music: "data:audio/mpeg;base64,AAAA" })), { musicVolume: 0.4 });
+  assert.deepEqual(parseKit(JSON.stringify({ musicVolume: 3 })), {});
+  assert.deepEqual(parseKit(JSON.stringify({ musicVolume: "0.4" })), {});
+});

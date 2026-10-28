@@ -109,7 +109,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   };
 
   async function keep(next: Settings) {
-    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, layout: next.layout, visual: next.visual };
+    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume };
     if (typeof next.theme === "number") entry.theme = next.theme;
     for (const field of ["cover", "background", "logo"] as const) {
       const picture = next[field];

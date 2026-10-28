@@ -6,6 +6,8 @@ export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layou
   cover?: string;
   background?: string;
   logo?: string;
+  /** The music's level; the music itself is too big to keep and is opened again each visit. */
+  musicVolume?: number;
 };
 
 const KEY = "soundbite:kit";
@@ -29,6 +31,8 @@ export function parseKit(raw: string | null): Kit {
   if (LAYOUTS.includes(value.layout as Layout)) kit.layout = value.layout as Layout;
   if (VISUALS.includes(value.visual as Visual)) kit.visual = value.visual as Visual;
   if (Number.isInteger(value.theme) && (value.theme as number) >= 0) kit.theme = value.theme as number;
+  const level = value.musicVolume;
+  if (typeof level === "number" && level >= 0 && level <= 1) kit.musicVolume = level;
   for (const field of ["cover", "background", "logo"] as const) {
     const picture = value[field];
     if (typeof picture === "string" && picture.startsWith("data:image/")) kit[field] = picture;
