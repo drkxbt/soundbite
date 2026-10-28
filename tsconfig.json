@@ -29,6 +29,7 @@
     "ads.ts",
     "config.ts",
     "app.ts",
-    "panel.ts"
+    "panel.ts",
+    "failures.ts"
   ]
 }

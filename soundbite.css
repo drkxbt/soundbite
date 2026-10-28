@@ -57,6 +57,8 @@
 .sb[data-tone="done"] .sb-status { color: var(--sb-mint-text); }
 .sb[data-tone="warn"] .sb-status { color: var(--sb-warn); }
 .sb[data-clean] .sb-credit-note { color: var(--sb-mint-text); }
+.sb-percent { flex: none; color: var(--sb-text); font-variant-numeric: tabular-nums; }
+.sb-percent:empty { display: none; }
 
 /* The key action of the bar wears the mint the way Audiogram's export does, but quieter: its icon and a wash. */
 .sb .sb-transcribe { color: var(--sb-mint-text); background: var(--sb-mint-wash); }
@@ -112,6 +114,8 @@
 }
 .sb-thanks { display: none; }
 .sb-thanks:popover-open { display: grid; gap: 12px; }
+/* The card itself takes focus only to be found; its keys carry the visible focus rings. */
+.sb-thanks:focus { outline: none; }
 .sb-thanks-text p { margin: 0; color: var(--sb-muted); text-wrap: pretty; }
 .sb-thanks-text .sb-thanks-title { margin-bottom: 4px; color: var(--sb-text); font-size: 14.5px; font-weight: 600; text-wrap: balance; }
 .sb-thanks-keys { display: flex; gap: 6px; }

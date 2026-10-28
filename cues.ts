@@ -78,8 +78,17 @@ export function isHallucination(words: Word[]): boolean {
   return false;
 }
 
-/** The captions after transcribing `range`: the fresh ones in place of any that touched it, in time order. */
+/**
+ * The captions after transcribing `range`: the fresh ones in place of any that touched it, in time order. A caption
+ * that straddles an edge keeps the words it has outside the range; one without word times can't be cut, so it goes.
+ */
 export function mergeCues(existing: Cue[], fresh: Cue[], [start, end]: [number, number]): Cue[] {
-  const kept = existing.filter((cue) => cue.end <= start || cue.start >= end);
+  const kept = existing.flatMap((cue) => {
+    if (cue.end <= start || cue.start >= end) return [cue];
+    if (!cue.words?.length) return [];
+    return [cue.words.filter((word) => word.end <= start), cue.words.filter((word) => word.start >= end)]
+      .filter((part) => part.length)
+      .map((part) => ({ ...cue, start: part[0].start, end: part.at(-1)!.end, text: part.map((word) => word.text).join(" "), words: part }));
+  });
   return [...kept, ...fresh].sort((a, b) => a.start - b.start);
 }

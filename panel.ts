@@ -21,6 +21,7 @@ export function showThanks(host: HTMLElement, { x, repo }: { x: string; repo: st
     panel.setAttribute("popover", "auto");
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-labelledby", "sb-thanks-title");
+    panel.tabIndex = -1;
     panel.innerHTML = `
       <div class="sb-thanks-text">
         <p class="sb-thanks-title" id="sb-thanks-title">Your clip is downloading</p>
@@ -39,5 +40,13 @@ export function showThanks(host: HTMLElement, { x, repo }: { x: string; repo: st
     panel.querySelector(".sb-close")!.addEventListener("click", () => panel?.hidePopover());
     host.append(panel);
   }
-  if (!panel.matches(":popover-open")) panel.showPopover();
+  if (panel.matches(":popover-open")) return;
+  // Focus moves into the card so a keyboard or screen reader finds it, and goes back where it was when it closes.
+  const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const card = panel;
+  card.addEventListener("toggle", (event) => {
+    if ((event as ToggleEvent).newState === "closed" && card.contains(document.activeElement)) before?.focus({ preventScroll: true });
+  }, { once: true });
+  card.showPopover();
+  card.focus({ preventScroll: true });
 }

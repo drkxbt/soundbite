@@ -2,11 +2,12 @@
 import { env, pipeline, WhisperTextStreamer, type AutomaticSpeechRecognitionPipeline, type WhisperTokenizer } from "@huggingface/transformers";
 import { SPEECH_RATE } from "./audio.js";
 import type { Chunk } from "./cues.js";
+import { isNetworkFailure } from "./failures.js";
 
 export type WorkerMessage =
   | { type: "progress"; stage: "download" | "transcribe"; percent: number }
   | { type: "done"; chunks: Chunk[] }
-  | { type: "error"; name: "DownloadError" | "Error"; message: string };
+  | { type: "error"; name: "DownloadError" | "LoadError" | "Error"; message: string };
 
 // Pinned, so a change upstream can't change what visitors download.
 const MODEL = "onnx-community/whisper-tiny_timestamped";
@@ -45,7 +46,9 @@ function load(): Promise<AutomaticSpeechRecognitionPipeline> {
     if (!adapter) return open(false);
     try {
       return await open(true);
-    } catch {
+    } catch (error) {
+      // A GPU that can't run the encoder falls back to WebAssembly; a dropped download is a download problem either way.
+      if (isNetworkFailure(error)) throw error;
       return open(false);
     }
   })();
@@ -55,12 +58,14 @@ self.addEventListener("message", async (event: MessageEvent<{ samples: Float32Ar
   const { samples } = event.data;
   let asr: AutomaticSpeechRecognitionPipeline;
   try {
+    const loading = !model;
     model ??= load();
     asr = await model;
-    post({ type: "progress", stage: "download", percent: 100 });
+    // Only the run that loaded the model reports the download finished; later runs start straight at listening.
+    if (loading) post({ type: "progress", stage: "download", percent: 100 });
   } catch (error) {
     model = null;
-    post({ type: "error", name: "DownloadError", message: String((error as Error)?.message ?? error) });
+    post({ type: "error", name: isNetworkFailure(error) ? "DownloadError" : "LoadError", message: String((error as Error)?.message ?? error) });
     return;
   }
   try {

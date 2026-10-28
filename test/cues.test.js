@@ -85,3 +85,15 @@ test("new captions replace only the ones inside the range they cover", () => {
   assert.deepEqual(mergeCues(existing, fresh, [10, 20]).map((cue) => cue.text), ["before", "new", "after"]);
   assert.deepEqual(mergeCues([], [], [0, 5]), []);
 });
+
+test("a caption that straddles the transcribed range keeps the words outside it", () => {
+  const straddler = { start: 18, end: 22, text: "a b c d", words: [
+    { text: "a", start: 18, end: 18.8 }, { text: "b", start: 19, end: 19.9 }, { text: "c", start: 20.2, end: 21 }, { text: "d", start: 21.2, end: 22 },
+  ] };
+  const fresh = [{ start: 20, end: 25, text: "new", words: [{ text: "new", start: 20, end: 25 }] }];
+  const merged = mergeCues([straddler], fresh, [20, 30]);
+  assert.deepEqual(merged.map((cue) => [cue.start, cue.end, cue.text]), [[18, 19.9, "a b"], [20, 25, "new"]]);
+  assert.deepEqual(merged[0].words.map((word) => word.text), ["a", "b"]);
+  const tail = mergeCues([straddler], [], [17, 21.1]);
+  assert.deepEqual(tail.map((cue) => [cue.start, cue.end, cue.text]), [[21.2, 22, "d"]]);
+});

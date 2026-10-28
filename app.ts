@@ -62,6 +62,10 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   const status = document.createElement("p");
   status.className = "sb-status";
   status.setAttribute("role", "status");
+  // The count runs beside the status, kept out of it, so a screen reader hears each step once rather than every percent.
+  const percent = document.createElement("span");
+  percent.className = "sb-percent";
+  percent.setAttribute("aria-hidden", "true");
   // Without an ad unit the credit comes off for free, and the key says so.
   const creditKey = keyButton("sb-credit", settings.adUnit ? "Watch a short ad to remove the credit" : "Remove the credit", ICONS.credit);
   const creditNote = document.createElement("p");
@@ -69,7 +73,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   creditNote.setAttribute("role", "status");
   const work = document.createElement("div");
   work.className = "sb-transcript";
-  work.append(transcribeKey, status, meter);
+  work.append(transcribeKey, status, percent, meter);
   const clean = document.createElement("div");
   clean.className = "sb-clean";
   clean.append(creditNote, creditKey);
@@ -84,9 +88,10 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     status.textContent = text;
     root.dataset.tone = tone;
   };
-  const setMeter = (percent: number | null) => {
-    root.toggleAttribute("data-working", percent !== null);
-    meter.style.setProperty("--done", String((percent ?? 0) / 100));
+  const setMeter = (done: number | null) => {
+    root.toggleAttribute("data-working", done !== null);
+    meter.style.setProperty("--done", String((done ?? 0) / 100));
+    percent.textContent = done === null ? "" : `${done}%`;
   };
 
   // The kit the user left last time fills the editor in; the picture comes back as the data URL it was kept as.
@@ -135,9 +140,10 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   // Each transcription gets a number; stopping or starting another makes an older one's results stale at any await.
   let run = 0;
   const transcriber = createTranscriber({
-    onProgress: ({ stage: step, percent }: Progress) => {
-      setMeter(percent);
-      say(step === "download" ? `Getting the speech model, ${percent}%. Only the first time.` : `Listening, ${percent}%`, "busy");
+    onProgress: ({ stage: step, percent: done }: Progress) => {
+      setMeter(done);
+      const text = step === "download" ? "Getting the speech model, kept for next time" : "Listening";
+      if (status.textContent !== text) say(text, "busy");
     },
   });
 
@@ -193,6 +199,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       const name = (error as Error).name;
       if (name === "AbortError") idle();
       else if (name === "DownloadError") say("Couldn't download the speech model. Check your connection and try again", "warn");
+      else if (name === "LoadError") say("This device couldn't start the speech model. Try another browser, or close a few tabs", "warn");
       else say("Couldn't transcribe this part. Try again, or a shorter part", "warn");
     } finally {
       if (mine === run) settle();
