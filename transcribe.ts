@@ -11,7 +11,7 @@ export interface Progress {
 export interface Transcriber {
   /** The words in `samples` (16 kHz, one channel), in recording time: `offset` is where the samples start. */
   transcribe(samples: Float32Array, offset: number): Promise<Word[]>;
-  /** Stops the work in hand; its promise rejects with an AbortError. The model stays cached for next time. */
+  /** Stops the work in hand, if any; its promise rejects with an AbortError. The model stays cached for next time. */
   cancel(): void;
 }
 
@@ -60,6 +60,8 @@ export function createTranscriber({ onProgress }: { onProgress?: (progress: Prog
       });
     },
     cancel() {
+      // Only work in hand is stopped; an idle worker keeps its model warm for the next part.
+      if (!pending) return;
       worker?.terminate();
       worker = null;
       fail(new DOMException("Transcription cancelled", "AbortError"));

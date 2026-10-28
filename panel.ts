@@ -13,6 +13,8 @@ let panel: HTMLElement | null = null;
  * layer without blocking the page: a tap outside, Escape or its close key puts it away.
  */
 export function showThanks(host: HTMLElement, { x, repo }: { x: string; repo: string }): void {
+  // Browsers without popovers (Safari before 17) skip the card rather than fail the download that called for it.
+  if (!("showPopover" in HTMLElement.prototype)) return;
   if (!panel || !host.contains(panel)) {
     panel = document.createElement("div");
     panel.className = "sb-thanks";

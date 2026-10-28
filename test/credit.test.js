@@ -41,3 +41,17 @@ test("the credit sits small in the top right corner, inside the margin above eve
 test("with no ad unit set up, removing the credit needs no ad", async () => {
   assert.equal(await watchAd(""), "granted");
 });
+
+test("an ad tag that never loads gives up instead of waiting for ever", async () => {
+  // A page where Google's tag is requested but neither loads nor fails, as some blockers leave it.
+  globalThis.window = {};
+  globalThis.document = { createElement: () => ({ addEventListener() {}, remove() {} }), head: { append() {} } };
+  try {
+    const started = Date.now();
+    assert.equal(await watchAd("/1/test", { timeout: 60 }), "unavailable");
+    assert.ok(Date.now() - started < 1000);
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+  }
+});

@@ -62,6 +62,18 @@ test("silence and Whisper's stock phrases count as no speech", () => {
   assert.equal(isHallucination(words("ship small and ship often")), false);
 });
 
+test("Whisper's stock phrases in other languages, and output with no letters, count as no speech", () => {
+  for (const line of ["ご視聴ありがとうございました", "Продолжение следует...", "...", "♪ ♪", "Hãy đăng ký kênh để ủng hộ kênh của mình nhé!", "Sous-titres réalisés para la communauté d'Amara.org"]) {
+    assert.equal(isHallucination(words(line)), true, line);
+  }
+  assert.equal(isHallucination(words("Это была отличная неделя для команды")), false);
+});
+
+test("a word Whisper places after the end of the audio is dropped", () => {
+  const chunks = [{ text: " last", timestamp: [2.5, 2.9] }, { text: " ghost", timestamp: [3.4, 3.9] }];
+  assert.deepEqual(toWords(chunks, 0, 3.16).map((word) => word.text), ["last"]);
+});
+
 test("new captions replace only the ones inside the range they cover", () => {
   const existing = [
     { start: 0, end: 2, text: "before" },

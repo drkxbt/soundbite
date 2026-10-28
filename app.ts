@@ -1,5 +1,5 @@
 import { audiogram, type Editor, type Settings } from "@drkxbt/audiogram";
-import { decode, rangeSamples } from "./audio.js";
+import { isSilent, rangeSamples } from "./audio.js";
 import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
 import { credit } from "./credit.js";
@@ -62,7 +62,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   const status = document.createElement("p");
   status.className = "sb-status";
   status.setAttribute("role", "status");
-  const creditKey = keyButton("sb-credit", "Watch a short ad to remove the credit", ICONS.credit);
+  // Without an ad unit the credit comes off for free, and the key says so.
+  const creditKey = keyButton("sb-credit", settings.adUnit ? "Watch a short ad to remove the credit" : "Remove the credit", ICONS.credit);
   const creditNote = document.createElement("p");
   creditNote.className = "sb-credit-note";
   creditNote.setAttribute("role", "status");
@@ -121,7 +122,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       link.download = `soundbite-${stamp}.${extension}`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-      // A watched ad buys one clean download; the next clip carries the credit again.
+      // A watched ad buys one clean download; the next clip carries the credit again. The key is locked while a
+      // video is made, so the credit was already off when this one started.
       if (!creditOn) setCredit(true);
       showThanks(root, settings);
     },
@@ -130,7 +132,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   // Transcription.
 
   let busy = false;
-  let decoded: { source: string | Blob; buffer: Promise<AudioBuffer> } | null = null;
+  // Each transcription gets a number; stopping or starting another makes an older one's results stale at any await.
+  let run = 0;
   const transcriber = createTranscriber({
     onProgress: ({ stage: step, percent }: Progress) => {
       setMeter(percent);
@@ -148,39 +151,51 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     else say(`No captions yet for ${part}`);
   };
 
+  function settle() {
+    busy = false;
+    relabel(transcribeKey, "Transcribe this part", ICONS.transcribe);
+    setMeter(null);
+  }
+
+  function stop() {
+    run++;
+    transcriber.cancel();
+    settle();
+    idle();
+  }
+
   async function transcribe() {
-    if (busy) {
-      transcriber.cancel();
-      return;
-    }
+    if (busy) return stop();
     const source = editor.source;
-    if (!source || !ready()) return idle();
+    const audio = editor.audio;
+    if (!source || !audio || !ready()) return idle();
+    const mine = ++run;
+    // Whatever comes back is dropped once this run was stopped or another recording opened.
+    const current = () => mine === run && editor.source === source;
     busy = true;
     relabel(transcribeKey, "Stop transcribing", ICONS.stop);
     setMeter(0);
     say("Reading the recording", "busy");
     try {
-      if (decoded?.source !== source) {
-        const blob = typeof source === "string" ? fetch(source).then((response) => response.blob()) : Promise.resolve(source);
-        decoded = { source, buffer: blob.then(decode) };
-      }
       const [start, end] = editor.range;
-      const words = await transcriber.transcribe(rangeSamples(await decoded.buffer, start, end), start);
+      const samples = await rangeSamples(audio, start, end);
+      if (!current()) return;
+      if (isSilent(samples)) return say("No speech found in this part", "warn");
+      const words = await transcriber.transcribe(samples, start);
+      if (!current()) return;
       if (isHallucination(words)) say("No speech found in this part", "warn");
       else {
         editor.setCaptions(mergeCues(editor.captions, wordsToCues(words), [start, end]));
         say("Captions in. Fix any word in the list on the right", "done");
       }
     } catch (error) {
+      if (!current()) return;
       const name = (error as Error).name;
       if (name === "AbortError") idle();
       else if (name === "DownloadError") say("Couldn't download the speech model. Check your connection and try again", "warn");
       else say("Couldn't transcribe this part. Try again, or a shorter part", "warn");
-      if (name !== "DownloadError" && name !== "AbortError") decoded = null;
     } finally {
-      busy = false;
-      relabel(transcribeKey, "Transcribe this part", ICONS.transcribe);
-      setMeter(null);
+      if (mine === run) settle();
     }
   }
 
@@ -192,12 +207,21 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     root.toggleAttribute("data-clean", !on);
     creditKey.disabled = !on;
     creditNote.textContent = on ? "Clips carry a small made-with credit" : "Your next download has no credit";
+    lockCredit();
+  }
+
+  // The key works only while the credit is on, no ad is loading, and no video is being made from the current look.
+  let adLoading = false;
+  function lockCredit() {
+    creditKey.disabled = !creditOn || adLoading || editor.element.dataset.state === "exporting";
   }
 
   async function removeCredit() {
-    creditKey.disabled = true;
-    creditNote.textContent = "Loading a short ad";
+    adLoading = true;
+    lockCredit();
+    if (settings.adUnit) creditNote.textContent = "Loading a short ad";
     const result = await watchAd(settings.adUnit);
+    adLoading = false;
     if (result === "granted") return setCredit(false);
     setCredit(true);
     creditNote.textContent = result === "closed"
@@ -210,13 +234,18 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
 
   // The bar follows the editor: what can be transcribed changes as a recording loads and the range moves.
   // A recording that has just opened is transcribed straight away, once; the key does it again for another part.
-  let transcribed: string | Blob | null = null;
+  let opened: string | Blob | null = null;
   const watcher = new MutationObserver(() => {
+    // Another recording opening ends work on the one before it.
+    if (busy && editor.element.dataset.state === "loading") stop();
     transcribeKey.disabled = !ready() && !busy;
+    lockCredit();
     if (!busy && root.dataset.tone !== "warn") idle();
-    if (autoTranscribe && ready() && !busy && editor.source && editor.source !== transcribed) {
-      transcribed = editor.source;
-      void transcribe();
+    if (ready() && editor.source && editor.source !== opened) {
+      // Captions belong to the recording they were heard in: a new one replacing another starts with none.
+      if (opened) editor.setCaptions([]);
+      opened = editor.source;
+      if (autoTranscribe && !busy) void transcribe();
     }
   });
   watcher.observe(editor.element, { attributes: true, attributeFilter: ["data-state"] });

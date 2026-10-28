@@ -48,42 +48,48 @@ function loadTag(): Promise<GoogleTag> {
  */
 export async function watchAd(adUnit: string, { timeout = 10000 } = {}): Promise<AdResult> {
   if (!adUnit) return "granted";
-  let tag: GoogleTag;
-  try {
-    tag = await loadTag();
-  } catch {
-    return "unavailable";
-  }
   return new Promise<AdResult>((resolve) => {
-    tag.cmd.push(() => {
-      const slot = tag.defineOutOfPageSlot(adUnit, tag.enums.OutOfPageFormat.REWARDED);
-      if (!slot) return resolve("unavailable");
-      const pubads = tag.pubads();
-      let granted = false;
-      let shown = false;
-      const finish = (result: AdResult) => {
-        clearTimeout(timer);
-        for (const [type, listener] of listeners) pubads.removeEventListener(type, listener);
-        tag.destroySlots([slot]);
-        resolve(result);
-      };
-      const mine = (listener: (event: SlotEvent) => void) => (event: SlotEvent) => event.slot === slot && listener(event);
-      const listeners: Array<[string, (event: SlotEvent) => void]> = [
-        ["rewardedSlotReady", mine((event) => {
-          // The person already asked to watch by pressing the button, so the ad opens straight away.
-          shown = true;
-          event.makeRewardedVisible?.();
-        })],
-        ["rewardedSlotGranted", mine(() => (granted = true))],
-        ["rewardedSlotClosed", mine(() => finish(granted ? "granted" : "closed"))],
-        ["slotRenderEnded", mine((event) => event.isEmpty && finish("unavailable"))],
-      ];
-      // Once the ad is on screen the person decides how long it takes; the timeout is only for one that never comes.
-      const timer = setTimeout(() => !shown && finish("unavailable"), timeout);
-      for (const [type, listener] of listeners) pubads.addEventListener(type, listener);
-      slot.addService(pubads);
-      tag.enableServices();
-      tag.display(slot);
-    });
+    let shown = false;
+    let settled = false;
+    let cleanup = () => {};
+    const finish = (result: AdResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(result);
+    };
+    // Counted from the request, not from the tag's arrival: a tag that never loads, a blocker's stand-in that never
+    // runs the queue, or no ad to show all end here. Once the ad is on screen the person decides how long it takes.
+    const timer = setTimeout(() => !shown && finish("unavailable"), timeout);
+    loadTag().then((tag) => tag.cmd.push(() => {
+      try {
+        const slot = tag.defineOutOfPageSlot(adUnit, tag.enums.OutOfPageFormat.REWARDED);
+        if (!slot) return finish("unavailable");
+        const pubads = tag.pubads();
+        let granted = false;
+        const mine = (listener: (event: SlotEvent) => void) => (event: SlotEvent) => event.slot === slot && listener(event);
+        const listeners: Array<[string, (event: SlotEvent) => void]> = [
+          ["rewardedSlotReady", mine((event) => {
+            // The person already asked to watch by pressing the button, so the ad opens straight away.
+            shown = true;
+            event.makeRewardedVisible?.();
+          })],
+          ["rewardedSlotGranted", mine(() => (granted = true))],
+          ["rewardedSlotClosed", mine(() => finish(granted ? "granted" : "closed"))],
+          ["slotRenderEnded", mine((event) => event.isEmpty && finish("unavailable"))],
+        ];
+        cleanup = () => {
+          for (const [type, listener] of listeners) pubads.removeEventListener(type, listener);
+          tag.destroySlots([slot]);
+        };
+        for (const [type, listener] of listeners) pubads.addEventListener(type, listener);
+        slot.addService(pubads);
+        tag.enableServices();
+        tag.display(slot);
+      } catch {
+        finish("unavailable");
+      }
+    }), () => finish("unavailable"));
   });
 }
