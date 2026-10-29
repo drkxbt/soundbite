@@ -348,3 +348,13 @@ test("a dot ring drawn round a clock keeps its look when the sound style changes
     }
   });
 });
+
+test("a first visit starts every shape on Night Glass, with its page and colours, rather than a white page", async () => {
+  const { firstDesign } = await import("../dist/templates.js");
+  const design = firstDesign();
+  const glass = PODCAST_TEMPLATES.find((choice) => choice.id === "night-glass");
+  for (const layout of LAYOUTS) assert.deepEqual(design.layers[layout], glass.make(layout).layers, layout);
+  assert.deepEqual(design.page, glass.make("square").page);
+  assert.equal(design.theme, glass.make("square").theme);
+  assert.ok(design.layers.square.some((layer) => layer.kind === "captions") && design.layers.square.some((layer) => layer.kind === "visual"), "captions and sound from the start");
+});

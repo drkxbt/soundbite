@@ -10,7 +10,7 @@ import type { FontEntry } from "./fonts.js";
 /** A photo as photos.json lists it, its files relative to the photos folder. */
 type PhotoEntry = Omit<StockPhoto, "url" | "thumb"> & { file: string; thumb: string };
 import { showThanks } from "./panel.js";
-import { PODCAST_TEMPLATES } from "./templates.js";
+import { firstDesign, PODCAST_TEMPLATES } from "./templates.js";
 import { liveFeeds, offeredFeeds, offeredKlipyFeeds } from "./media.js";
 import { keepable, loadPictures, savePictures } from "./pictures.js";
 import { objects3dFeed } from "./objects3d.js";
@@ -154,20 +154,22 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     saveKit(entry);
   }
 
-  // A recording brings only its sound: the picture starts as a white page to build on. A kit from before pages had a
-  // colour keeps the look it had, the classic card on the theme's colours, when the user made a layout or chose a
-  // background picture; otherwise it starts white too.
+  // A first visit opens on a finished design to change. A kit from before pages had a colour keeps the look it had, the
+  // classic card on the theme's colours, when the user made a layout or chose a background picture. Start over always
+  // clears to a white page.
   const legacy = kit.page === undefined;
   const blank = !legacy || (!kit.layers && !kit.background);
+  const first = !kit.layers && !kit.background ? firstDesign() : null;
   const editor = audiogram(stage, {
     ...kit,
+    ...(first ? { layers: first.layers } : {}),
     // A background kept from before backgrounds were layers goes to the editor as a picture it can store, once; the
     // next save keeps it as a layer and no longer in the kit.
     background: kit.background ? dataUrlBlob(kit.background) ?? undefined : undefined,
     blank,
     templates: PODCAST_TEMPLATES,
-    page: legacy ? (blank ? undefined : null) : kit.page,
-    theme: legacy && blank ? undefined : kit.theme,
+    page: first ? first.page : legacy ? (blank ? undefined : null) : kit.page,
+    theme: first ? first.theme : legacy && blank ? undefined : kit.theme,
     overlay: credit,
     // A recording added to the clip has its captions written as soon as it is in, the way the first one does.
     onRecordings: () => (autoTranscribe && ready() && !running && !warning ? void work() : update()),

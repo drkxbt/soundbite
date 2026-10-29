@@ -1621,3 +1621,11 @@ export const PODCAST_TEMPLATES: TemplateChoice[] = [
   halo,
   liveRoom,
 ];
+
+/** The design a first visit opens on: Night Glass on every shape, so the clip looks finished before anything is
+ *  picked and every part of it is there to change. */
+export function firstDesign(): { layers: Record<Layout, Layer[]>; page: Page | null; theme?: number } {
+  const layouts: Layout[] = ["square", "portrait", "story", "landscape"];
+  const made = nightGlass.make("square");
+  return { layers: Object.fromEntries(layouts.map((layout) => [layout, nightGlass.make(layout).layers])) as Record<Layout, Layer[]>, page: made.page, theme: made.theme };
+}
