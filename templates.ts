@@ -502,7 +502,7 @@ const nightGlass = template("night-glass", "Night Glass", { color: "#141824", to
   const clockWidget = (x: number, y: number, side: number) => {
     glass(f, "clock", x, y, side, side, pane);
     const d = side - inset * 2;
-    f.add("visual", "ring", x + inset, y + inset, d, d, { visual: "ring", color: amber });
+    f.add("visual", "ring", x + inset, y + inset, d, d, { visual: "ring", color: amber, keepLook: true });
     clockAt(f, "main", x + side / 2, y + side / 2, (d * 0.8) / f.unit, { clock: "elapsed", font: DOTS, size: Math.round((d / f.unit) * 0.22), weight: 300, color: WHITE });
   };
   /** The speaker widget: their photo at the top left, name and handle along the foot. */

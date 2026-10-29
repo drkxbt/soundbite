@@ -105,7 +105,7 @@ function parseLayer(value: unknown): Layer | null {
   if (w <= 0 || h <= 0 || w > 4 || h > 4 || Math.abs(x) > 4 || Math.abs(y) > 4) return null;
   const layer: Record<string, unknown> = { id: v.id.slice(0, 80), kind: v.kind, x, y, w, h, rotation: number("rotation") ?? 0, opacity: clamp(number("opacity") ?? 1, 0, 1) };
   const put = (key: string, found: unknown) => found !== undefined && (layer[key] = found);
-  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase", "underline", "strike", "arrowStart", "arrowEnd", "autoWidth", "backdrop", "header", "stripes", "showLabels", "showValues", "showGrid", "gloss", "react"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
+  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase", "underline", "strike", "arrowStart", "arrowEnd", "autoWidth", "backdrop", "keepLook", "header", "stripes", "showLabels", "showValues", "showGrid", "gloss", "react"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
   put("text", text("text", 2000));
   put("font", text("font", 80));
   put("image", text("image", 80));

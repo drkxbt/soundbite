@@ -201,6 +201,7 @@ test("words that hug their text, a background and the newer ways in and out are 
   assert.equal(text.direction, "left");
   assert.equal(layerIn({ direction: "sideways" }).direction, undefined);
   assert.equal(layerIn({ kind: "image", backdrop: true }).backdrop, true);
+  assert.equal(layerIn({ kind: "visual", visual: "ring", keepLook: true }).keepLook, true);
   assert.equal(layerIn({ shape: "burst" }).shape, "burst");
   assert.equal(layerIn({ shape: "line", bend: 400, cap: "round" }).bend, 100);
 });

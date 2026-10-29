@@ -340,3 +340,11 @@ test("a figure written as words sits level with the clocks beside it: words are 
     }
   });
 });
+
+test("a dot ring drawn round a clock keeps its look when the sound style changes; the main sound follows it", () => {
+  every((layers, where) => {
+    for (const layer of layers.filter((item) => item.kind === "visual")) {
+      assert.equal(layer.keepLook === true, layer.id !== "visual-main", `${where}: ${layer.id}`);
+    }
+  });
+});
