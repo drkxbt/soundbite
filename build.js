@@ -2,6 +2,7 @@
 import { build } from "esbuild";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { writeLogos } from "./scripts/logos.js";
 
 const out = "dist/app";
 await build({
@@ -57,3 +58,8 @@ await writeFile(`${out}/fonts/fonts.json`, JSON.stringify(fonts));
 // the script has since replaced is not left behind.
 await rm(`${out}/photos`, { recursive: true, force: true });
 await cp("photos", `${out}/photos`, { recursive: true });
+
+// The brand logos for the Elements panel, from the simple-icons package. A featured platform the package has dropped
+// is only worth a line, so a newer release never stops the build.
+const logos = await writeLogos(`${out}/logos`);
+if (logos.skipped.length) console.log(`logos: ${logos.count} written; not in simple-icons: ${logos.skipped.join(", ")}`);

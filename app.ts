@@ -11,6 +11,7 @@ import type { FontEntry } from "./fonts.js";
 type PhotoEntry = Omit<StockPhoto, "url" | "thumb"> & { file: string; thumb: string };
 import { showThanks } from "./panel.js";
 import { PODCAST_TEMPLATES } from "./templates.js";
+import { liveFeeds, offeredFeeds } from "./media.js";
 import { loadPictures, savePictures } from "./pictures.js";
 import { Coverage, cutPoint, type Span } from "./sweep.js";
 import { createTranscriber, type Progress } from "./transcribe.js";
@@ -207,14 +208,24 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     void keep(editor.settings);
   });
   // The free photos, bundled next to the app, read once the page has settled so they never hold up the editor.
+  // With them, the stock sources the hosting page searches for us, the ones that answer, and the brand logos, which
+  // are read only when their section is first shown.
   const photosAt = new URL("./photos/", import.meta.url);
+  const logosAt = new URL("./logos/", import.meta.url);
   setTimeout(() => {
-    void fetch(new URL("photos.json", photosAt))
-      .then((response) => (response.ok ? (response.json() as Promise<PhotoEntry[]>) : []))
-      .catch((): PhotoEntry[] => [])
-      .then((photos) => editor.setLibrary({
-        photos: photos.map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
-      }));
+    void Promise.all([
+      fetch(new URL("photos.json", photosAt))
+        .then((response) => (response.ok ? (response.json() as Promise<PhotoEntry[]>) : []))
+        .catch((): PhotoEntry[] => []),
+      settings.media ? offeredFeeds(settings.media).then(liveFeeds) : Promise.resolve([]),
+    ]).then(([photos, media]) => editor.setLibrary({
+      photos: photos.map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
+      media,
+      logos: () => fetch(new URL("logos.json", logosAt)).then((response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        return response.json();
+      }),
+    }));
   }, 800);
   editor.slots.actions.append(creditWrap);
   editor.slots.captions.append(redoKey);

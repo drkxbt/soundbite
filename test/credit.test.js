@@ -30,7 +30,7 @@ test("the credit is on every frame, from the first to the last", () => {
   for (const time of [0, 15, 30]) {
     const { ctx, texts } = recordingContext();
     credit(ctx, frame(time));
-    assert.equal(texts.map((item) => item.text).join(" "), "made with drk.vc/soundbite");
+    assert.equal(texts.map((item) => item.text).join(" "), "made with drk.vc/engines/soundbite");
   }
 });
 

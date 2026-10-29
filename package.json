@@ -1,6 +1,6 @@
 {
   "name": "soundbite",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Turn the best minute of a Space or a podcast into a captioned video for X, TikTok, Reels, Shorts or LinkedIn, in the browser: the words are transcribed and timed on your device, and nothing is uploaded.",
   "license": "MIT",
@@ -74,6 +74,7 @@
     "@fontsource/space-mono": "^5.3.0",
     "@fontsource/tenor-sans": "^5.3.0",
     "esbuild": "^0.25.0",
+    "simple-icons": "^16.36.0",
     "typescript": ">=5.4"
   }
 }

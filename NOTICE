@@ -17,5 +17,13 @@ The editor's fonts come from Fontsource under the SIL Open Font License 1.1, eac
 dist/app/fonts/. The ornaments in the podcast designs are drawn in ornaments.ts for this project. The photos in photos/
 are in the public domain (CC0), found through Openverse; photos/CREDITS.md credits each one's photographer.
 
+Stock photos, illustrations, videos, stickers and GIFs, when the hosting page offers a search for them, come from
+Pixabay, Pexels and GIPHY under each library's own licence; the panel credits the library and the author of each one.
+None of them is bundled with this repository.
+
+The brand logos in the Elements panel come from Simple Icons (simpleicons.org) under CC0 1.0, written to
+dist/app/logos/ with their licence note at build time. Each mark belongs to its owner and is offered only so a clip
+can say where to find the show; none of those companies has any connection with this project.
+
 X is named only to say what the clips are for; X Corp. has no connection with this project. Google Ad Manager serves
 the optional rewarded ad on drk.vc's copy; Google has no connection with this project either.

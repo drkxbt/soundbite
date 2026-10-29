@@ -1,13 +1,13 @@
 import type { Overlay } from "@drkxbt/audiogram";
 
-export const CREDIT = "made with drk.vc/soundbite";
+export const CREDIT = "made with drk.vc/engines/soundbite";
 const LEAD = "made with";
-const SITE = "drk.vc/soundbite";
+const SITE = "drk.vc/engines/soundbite";
 
 /**
- * "made with drk.vc/soundbite" as a small label in the top right corner of every frame: light words on a dark chip of
- * its own, so it reads on any page, picture or video behind it, whatever the theme. It sits in the margin Audiogram
- * leaves above the header in every shape, so it never covers the classic card's name, visual or captions.
+ * "made with drk.vc/engines/soundbite" as a small label in the top right corner of every frame: light words on a dark
+ * chip of its own, so it reads on any page, picture or video behind it, whatever the theme. It sits in the margin
+ * Audiogram leaves above the header in every shape, so it never covers the classic card's name, visual or captions.
  */
 export const credit: Overlay = (ctx, { width, height, unit, font }) => {
   // The same margin Audiogram lays its frame out with.

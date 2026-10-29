@@ -9,6 +9,8 @@ export interface Config {
   x: string;
   /** The repo the panel asks people to star. */
   repo: string;
+  /** The hosting site's stock search, which keeps the sources' keys; empty for no stock photos, videos or stickers. */
+  media: string;
 }
 
-export const config: Config = { adUnit: "", x: "drkxbt", repo: "https://github.com/drkxbt/soundbite" };
+export const config: Config = { adUnit: "", x: "drkxbt", repo: "https://github.com/drkxbt/soundbite", media: "" };

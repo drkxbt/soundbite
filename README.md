@@ -2,9 +2,9 @@
 
 Turn the best minute of an X Space, a podcast or a voice note into a captioned video for X, TikTok, Reels, Shorts or LinkedIn, in the browser. Open the recording and Whisper writes out every word and times it as it is said, starting with the moment you select. Pick a look and download an MP4. Everything runs on your device: the audio, the transcript and your picture are never uploaded.
 
-Make a clip on [drk.vc/soundbite](https://drk.vc/soundbite), nothing to install.
+Make a clip on [drk.vc/engines/soundbite](https://drk.vc/engines/soundbite), nothing to install.
 
-![Soundbite in a dark page: the bar above the editor says the captions are in, the preview shows drk's name with a small "made with drk.vc/soundbite" in its top right corner, the captions list holds whole sentences, and a small card thanks the user as the clip downloads, with keys to follow on X and star the repo](demo/preview.jpg)
+![Soundbite in a dark page: the bar above the editor says the captions are in, the preview shows drk's name with a small "made with drk.vc/engines/soundbite" in its top right corner, the captions list holds whole sentences, and a small card thanks the user as the clip downloads, with keys to follow on X and star the repo](demo/preview.jpg)
 
 Hosted audiogram apps upload the recording, then charge a monthly plan for automatic captions and a clip without a watermark. Soundbite does both on the device and is MIT licensed, every feature included.
 
@@ -26,7 +26,7 @@ Hosted audiogram apps upload the recording, then charge a monthly plan for autom
 - **57 fonts for English text.** Open-licence fonts from Fontsource, from Inter and Poppins to Cinzel, Playfair Display, Bodoni Moda and Pinyon Script, bundled with the app and fetched only when used.
 - **Your look on it.** A background picture or video behind the design, up to three links along the bottom, and music under your voice at the level you set. Then Audiogram's own: square, 4:5, 9:16 or 16:9; bars, a wave or a pulse; five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
 - **Your look, kept.** Name, handle, links, pictures, shape and colours are kept in this browser and filled in next time.
-- **A credit, and a way to drop it.** Clips made at drk.vc/soundbite carry a small "made with drk.vc/soundbite" in the corner. Watching one short rewarded ad removes it from the next download; until ads are switched on there, it comes off for free. A copy you run yourself has no ad unit, so its credit comes off for free too.
+- **A credit, and a way to drop it.** Clips made at drk.vc/engines/soundbite carry a small "made with drk.vc/engines/soundbite" in the corner. Watching one short rewarded ad removes it from the next download; until ads are switched on there, it comes off for free. A copy you run yourself has no ad unit, so its credit comes off for free too.
 
 The speech model is about 44 to 66 MB on the first use, downloaded from Hugging Face and then kept by the browser. ONNX Runtime's WebAssembly (27 MB) is served next to the app.
 
@@ -54,17 +54,21 @@ Then open http://localhost:4340/demo/.
     adUnit: "",                               // a Google Ad Manager rewarded ad unit, or empty for no ads
     x: "drkxbt",                              // the account the after-download card asks people to follow
     repo: "https://github.com/drkxbt/soundbite",
+    media: "",                                // your stock search endpoint, or empty for no stock media
   });
 </script>
 ```
 
 Give the container a height; the editor fills it. `soundbite()` returns `{ editor, destroy() }`, where `editor` is the Audiogram editor.
 
+`media` turns on the stock photos, illustrations, videos, stickers and GIFs in the Elements panel. Soundbite asks it `GET <media>?source=pixabay|pexels|giphy&kind=photo|illustration|video|sticker|gif&q=<words>&page=<n>` and expects `{ items: [{ id, kind, name, thumb, file, width, height, credit?: { name, url }, link }], more }`. The endpoint keeps the libraries' API keys on your server. Asked with no parameters, it can answer `{ sources: ["pixabay", "giphy"] }` to name the libraries it has keys for, and only those are asked; without that list every library is asked, and one that answers with an error is left out of the panel.
+
 A page with a Content Security Policy needs these sources:
 - `script-src 'self' 'wasm-unsafe-eval'` for the speech model's runtime;
 - `worker-src 'self'`;
 - `connect-src 'self' https://huggingface.co https://*.hf.co` for the model files;
-- `media-src 'self' blob:` and `img-src 'self' blob: data:` for the recording and pictures.
+- `media-src 'self' blob:` and `img-src 'self' blob: data:` for the recording and pictures;
+- with `media` set, the stock libraries' image hosts in `img-src` and the hosts its files download from in `connect-src`.
 
 An ad unit also needs Google Publisher Tag's hosts. Nothing writes a `style` attribute, so `style-src 'self'` holds.
 
