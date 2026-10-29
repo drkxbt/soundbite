@@ -326,3 +326,17 @@ test("a template the user saved reads back from their kit unchanged", () => {
     assert.deepEqual(kept, JSON.parse(JSON.stringify(layers)), where);
   });
 });
+
+test("a figure written as words sits level with the clocks beside it: words are drawn from their top, clocks about their middle", () => {
+  every((layers, where) => {
+    const middle = (layer) => layer.y + layer.h / 2;
+    for (const text of layers.filter((layer) => layer.kind === "text" && /^text-(stat-\d+|episode)$/.test(layer.id))) {
+      const clocks = layers.filter((layer) => layer.kind === "time" && Math.abs(middle(layer) - middle(text)) < 0.05);
+      for (const clock of clocks) {
+        // Words drawn from the top of a box one line tall land where a clock centred in a taller box does.
+        const lineH = text.h;
+        assert.ok(Math.abs(text.y + lineH / 2 - middle(clock)) < 1e-6 && (text.lineHeight ?? 1) === 1, `${where}: ${text.id} against ${clock.id}`);
+      }
+    }
+  });
+});

@@ -320,7 +320,12 @@ function stats(f: Frame, c: Column, items: Stat[], look: StatLook, gap = 0): Blo
         const x = c.x + step * index;
         const w = step - f.px(16);
         if ("clock" in item) f.add("time", name, x, y, w, valueH, { align: "left", clock: item.clock, ...look.value });
-        else f.add("text", name, x, y, w, valueH, { text: item.text, align: "left", lineHeight: 1.2, ...look.value });
+        // Words are drawn from the top of their box and clocks about its middle, so the words get a box one line tall
+        // centred where the clocks' middle is, which sets them level.
+        else {
+          const lineH = f.lines(look.value.size ?? 40, 1, 1);
+          f.add("text", name, x, y + (valueH - lineH) / 2, w, lineH, { text: item.text, align: "left", ...look.value, lineHeight: 1 });
+        }
         const top = y + valueH + between;
         icon(f, name, item.glyph, x, top + (under - f.px(glyph)) / 2, glyph, look.ink, look.dim);
         f.add("text", `${name}-label`, x + f.px(glyph + 10), top + (under - labelH) / 2, w - f.px(glyph + 10), labelH, { text: item.label, align: "left", lineHeight: 1.25, color: look.ink, opacity: look.dim, ...look.label });
@@ -829,7 +834,8 @@ const editorial = template("editorial", "Editorial", { color: "#f5f4f0" }, PAPER
   const metaRow = (c: Column, gap = 0): Block => {
     const h = f.lines(meta.size!, 1, 1.25);
     return { h, gap: f.px(gap), draw: (y) => {
-      f.add("text", "episode", c.x, y, c.w / 2, h, { text: "Episode 00", align: "left", lineHeight: 1.25, ...meta });
+      const lineH = f.lines(meta.size!, 1, 1);
+      f.add("text", "episode", c.x, y + (h - lineH) / 2, c.w / 2, lineH, { text: "Episode 00", align: "left", ...meta, lineHeight: 1 });
       f.add("time", "main", c.x + c.w / 2, y, c.w / 2, h, { align: "right", lineHeight: 1.25, ...meta });
     } };
   };
@@ -949,9 +955,10 @@ const rainWindow = template("rain-window", "Rain Window", { color: "#26303a", to
   const portrait: Portrait = { fill: "#c9d8e4", ink: "#1a242e", rim: WHITE };
   const a = area(f);
   /** An opening quote mark set in the words' own serif, `size` design pixels: a plain mark, where the drawn icon read
-   *  as "99". The serif draws it in the top fifth of its letter's box, so the row is only that tall. */
+   *  as "99". The serif draws it in the top fifth of its letter's box, so the row, and the mark's own box (what the
+   *  editor outlines when it is picked), are only that tall and stay clear of the words under it. */
   const quote = (c: Column, size: number, gap: number): Block => row(f, size * 0.3, gap, (y) => {
-    f.add("text", "quote", c.x - f.px(size * 0.03), y, f.px(size * 0.5), f.px(size), { text: "“", font: SERIF, size, lineHeight: 1, align: "left", color: WHITE, opacity: 0.6 });
+    f.add("text", "quote", c.x - f.px(size * 0.03), y, f.px(size * 0.5), f.px(size * 0.3), { text: "“", font: SERIF, size, lineHeight: 1, align: "left", color: WHITE, opacity: 0.6 });
   });
   const foot = (c: Column, d: number): Block => byline(f, c, d, portrait, name, handle, 0, (y, h) => {
     f.add("visual", "main", c.x + c.w - f.px(170), y + (h - f.px(36)) / 2, f.px(170), f.px(36), { visual: "bars", color: WHITE });
@@ -965,7 +972,8 @@ const rainWindow = template("rain-window", "Rain Window", { color: "#26303a", to
   const blocks: Blocks = [
     heading(f, inner, title, 2),
     quote(inner, f.by({ square: 200, portrait: 230, story: 260, landscape: 210 }), f.by({ square: 26, portrait: 34, story: 44, landscape: 30 })),
-    captions(f, inner, words, f.by({ square: 4, portrait: 5, story: 6, landscape: 4 }), f.by({ square: 10, portrait: 14, story: 20, landscape: 12 })),
+    // Room for the longest page the editor shows and little more, so a short page doesn't float far under the mark.
+    captions(f, inner, words, f.by({ square: 3, portrait: 4, story: 4, landscape: 3 }), f.by({ square: 10, portrait: 14, story: 20, landscape: 12 })),
     rule(f, inner, "rule", WHITE, 0.3, f.by({ square: 24, portrait: 34, story: 48, landscape: 30 })),
     foot(inner, f.by({ square: 56, portrait: 62, story: 70, landscape: 60 })),
   ];
