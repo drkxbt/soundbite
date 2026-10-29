@@ -1,7 +1,7 @@
 // The drawings in the Elements panel, one list per set: brand logos from Simple Icons, icons from Phosphor, emoji from
-// Microsoft's Fluent Emoji, and Pablo Stanley's Open Peeps and Open Doodles. Written at build time so the editor reads them from its own folder and never loads a
+// Microsoft's Fluent Emoji, and Pablo Stanley's Open Peeps, Humaaans and Open Doodles. Written at build time so the editor reads them from its own folder and never loads a
 // drawing from another host.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import * as simpleIcons from "simple-icons";
 import svgpath from "svgpath";
@@ -26,7 +26,7 @@ export const FEATURED = {
   ],
   icons: ["microphone", "headphones", "waveform", "broadcast", "chat-circle-dots", "heart", "star", "play-circle"],
   people: [
-    "face-smile-big", "face-loving-grin-2", "face-calm", "face-awe", "face-smile-lol", "peep-bun", "peep-afro", "peep-long-curly",
+    "face-smile-big", "face-loving-grin-2", "face-calm", "face-awe", "peep-bun", "peep-afro", "humaaan-sitting-2", "humaaan-standing-1",
   ],
   doodles: ["loving", "coffee", "dancing", "meditating", "reading", "selfie", "doggie", "groovy"],
   logos: [
@@ -170,7 +170,7 @@ const MOODS = {
   smileTeethGap: ["happy"], solemn: ["sad"], suspicious: ["doubtful"], tired: ["sleepy"], veryAngry: ["angry"],
 };
 
-/** Each Open Peeps head of hair on the shoulders with a face, and each face on a head of its own. */
+/** Each Open Peeps head of hair on the shoulders with a face, each face on a head of its own, then the Humaaans. */
 async function people() {
   const body = (await text(`${PEEPS}/index.js`)).match(/body: `([^]*?)`,\n\s*extra:/)?.[1];
   const heads = templates(await text(`${PEEPS}/components/head.js`));
@@ -196,8 +196,58 @@ async function people() {
     keep({ id: `face-${kebab(face)}`, name: `Face, ${words(face)}`, tags: ["face", "head", "peeps", ...(MOODS[face] ?? [])] }, markup);
   });
   drawings.sort((a, b) => a.name.localeCompare(b.name, "en") || a.id.localeCompare(b.id, "en"));
+  drawings.push(...(await humaaans(dropped)));
   const { version } = await json("@dicebear/open-peeps/package.json");
   return { drawings, dropped, version };
+}
+
+// Humaaans as scripts/humaaans.py keeps them: Pablo Stanley's figures as Sketch exported them, one per file. The files
+// are read as text, never run.
+const HUMAAANS = new URL("../humaaans/", import.meta.url);
+// The commit scripts/humaaans.py fetches from, which the licence file credits.
+const HUMAAANS_SOURCE = "https://github.com/Calinou/humaaans at commit 818f184";
+// The files are only numbered, so each figure is named for what tells it apart in the list: its hair, what it wears,
+// what it does or sits on.
+const HUMAAAN_NAMES = {
+  "standing-1": "flowing ponytail, blue hoodie", "standing-2": "beard, navy jumper",
+  "standing-3": "bun, blue jumper, reaching out", "standing-4": "curly hair, teal coat", "standing-5": "short hair, red jumper",
+  "standing-6": "bun, orange hoodie", "standing-7": "turban, pale jumper", "standing-8": "bob, blue skirt",
+  "standing-9": "flowing ponytail, red jacket", "standing-10": "top bun, red trousers, reaching out",
+  "standing-11": "beard, lab coat", "standing-12": "navy blazer, shorts", "standing-13": "long hair, blue skirt, reaching out",
+  "standing-14": "hijab, white coat", "standing-15": "two buns, red jacket", "standing-16": "curly hair, grey jumper",
+  "standing-17": "top bun, lab coat", "standing-18": "flowing ponytail, navy blazer", "standing-19": "beard, orange hoodie",
+  "standing-20": "hijab, blue jumper, reaching out", "standing-21": "hijab, navy blazer", "standing-22": "bun, teal coat",
+  "standing-23": "curly hair, orange hoodie", "standing-24": "top bun, blue skirt, reaching out",
+  "sitting-1": "flowing ponytail, on a ball", "sitting-2": "curly hair, on a stool", "sitting-3": "beard, in a wheelchair",
+  "sitting-4": "navy blazer, on a cube", "sitting-5": "hijab, on a stool", "sitting-6": "teal coat, on a ball",
+  "sitting-7": "top bun, in a wheelchair", "sitting-8": "orange hoodie, on a cube",
+};
+
+/** Each Humaaans figure in the box its shapes reach, tallying the ones the converter can't draw into `dropped`. */
+async function humaaans(dropped) {
+  const files = (await readdir(HUMAAANS)).filter((file) => /^(standing|sitting)-\d+\.svg$/.test(file));
+  if (!files.length) throw new Error("humaaans/ has no figures; run scripts/humaaans.py");
+  const drawings = [];
+  for (const file of files) {
+    const source = await readFile(new URL(file, HUMAAANS), "utf8");
+    const [, w, h] = source.match(/<svg [^>]*viewBox="0 0 ([\d.]+) ([\d.]+)"/) ?? [];
+    // Sketch wraps the drawing in a prolog, a comment, a title and a description, which draw nothing.
+    const body = source
+      .match(/<svg[^>]*>([^]*)<\/svg>/)?.[1]
+      .replace(/<!--[^]*?-->|<title>[^]*?<\/title>|<desc>[^]*?<\/desc>/g, "");
+    if (!body || !(Number(w) > 0 && Number(h) > 0)) throw new Error(`humaaans/${file} has changed shape`);
+    const { art, reason } = fitted(body, Number(w), Number(h));
+    if (reason) {
+      tally(dropped, reason);
+      continue;
+    }
+    const stem = file.slice(0, -".svg".length);
+    const [pose] = stem.split("-");
+    const name = HUMAAAN_NAMES[stem] ? `${sentenceCase(pose)}, ${HUMAAAN_NAMES[stem]}` : sentenceCase(stem);
+    const extra = name.includes("wheelchair") ? ["wheelchair"] : [];
+    drawings.push({ id: `humaaan-${stem}`, name, art, tags: ["person", "full body", pose, "humaaans", ...extra] });
+  }
+  return drawings.sort((a, b) => a.name.localeCompare(b.name, "en") || a.id.localeCompare(b.id, "en"));
 }
 
 // A slot in DiceBear's body template, which draws a part when the avatar has one.
@@ -839,6 +889,13 @@ function licence({ emoji, icons, people, doodles, logos }) {
     "hair with one of its faces on its shoulders, and each face is drawn on one of its heads, put together the way",
     `DiceBear's Open Peeps style puts them together, from @dicebear/open-peeps ${people.version}`,
     "(https://github.com/dicebear/dicebear), whose licence lists the design as Open Peeps by Pablo Stanley under CC0 1.0.",
+    "",
+    "The standing and sitting figures in people.json (tagged humaaans) are Humaaans by Pablo Stanley",
+    "(https://www.humaaans.com), copyright 2019 Pablo Stanley, licensed under Creative Commons Attribution 4.0",
+    "International (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). They come from the GitHub mirror",
+    `${HUMAAANS_SOURCE}, as published under that licence; the`,
+    "files and the full licence are in the Soundbite repository's humaaans/ folder. Each figure is redrawn as plain path",
+    "data and fitted to the box its shapes reach; its shapes and colours are unchanged.",
     "",
     "## Doodles (doodles.json)",
     "",

@@ -306,18 +306,28 @@ const dataUrlOf = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
-/** A picture cut to a centred square and shrunk to `size` pixels, as a JPEG data URL small enough to keep; a small SVG
- *  is kept whole, as a drawing. */
-export async function shrinkCover(blob: Blob, size = 256): Promise<string> {
+// The largest a design shows the speaker's photo: a cut-out circle can fill most of a 1080 frame, and a smaller copy
+// went soft as soon as it was shown big.
+const COVER_MOST = 1024;
+
+/** How many pixels across a kept profile picture is: as large as a design shows it, never larger than its own. */
+export function coverSide(width: number, height: number): number {
+  return Math.max(1, Math.min(COVER_MOST, Math.round(Math.min(width, height)) || 1));
+}
+
+/** A picture cut to a centred square and shrunk to fit COVER_MOST pixels, as a JPEG data URL small enough to keep; a
+ *  small SVG is kept whole, as a drawing. */
+export async function shrinkCover(blob: Blob): Promise<string> {
   if (blob.type === SVG && blob.size <= SVG_KEPT) return dataUrlOf(blob);
   const image = await drawable(blob);
   const side = Math.min(image.width, image.height);
+  const size = coverSide(image.width, image.height);
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   canvas.getContext("2d")!.drawImage(image.image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
   image.close();
-  return canvas.toDataURL("image/jpeg", 0.86);
+  return canvas.toDataURL("image/jpeg", 0.88);
 }
 
 /**

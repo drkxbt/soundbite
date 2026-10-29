@@ -250,3 +250,10 @@ test("every sound style is kept, for the whole kit and for a sound layer", () =>
   }
   assert.equal(parseKit(JSON.stringify({ visual: "spiral" })).visual, undefined);
 });
+
+test("a profile picture is kept large enough for a design that shows it big, and never blown up past its own size", async () => {
+  const { coverSide } = await import("../dist/kit.js");
+  assert.equal(coverSide(4000, 3000), 1024, "a phone photo: the largest a design shows it");
+  assert.equal(coverSide(640, 800), 640, "a smaller picture: its own shorter side, not stretched");
+  assert.equal(coverSide(0, 0), 1, "nothing to measure: one pixel, never zero");
+});

@@ -142,13 +142,13 @@ test("people are every Open Peeps head of hair as a bust and every face on a hea
   const people = sets.people;
   const busts = people.filter((drawing) => drawing.id.startsWith("peep-"));
   const faces = people.filter((drawing) => drawing.id.startsWith("face-"));
-  assert.equal(busts.length + faces.length, people.length);
+  const figures = people.filter((drawing) => drawing.id.startsWith("humaaan-"));
+  assert.equal(busts.length + faces.length + figures.length, people.length);
   assert.equal(busts.length, 48);
   assert.equal(faces.length, 30);
-  assert.deepEqual(result.sets.people.dropped, {});
   for (const drawing of busts) assert.deepEqual(drawing.tags, ["person", "bust", "peeps"], drawing.id);
   for (const drawing of faces) assert.deepEqual(drawing.tags.slice(0, 3), ["face", "head", "peeps"], drawing.id);
-  for (const drawing of people) {
+  for (const drawing of [...busts, ...faces]) {
     const fills = new Set(drawing.art.paths.map((part) => part.fill));
     assert.ok(fills.has("#000000") && fills.has("#ffffff"), drawing.id);
   }
@@ -158,6 +158,33 @@ test("people are every Open Peeps head of hair as a bust and every face on a hea
   assert.ok(byId.get("face-smile-big").tags.includes("happy"));
   // A bust stands on its shoulders, so it is taller than a face, which is only a head.
   assert.ok(byId.get("peep-afro").art.h > byId.get("face-smile").art.h * 1.5);
+});
+
+test("people end with the Humaaans figures, standing or sitting, in their own colours", () => {
+  const people = sets.people;
+  const figures = people.filter((drawing) => drawing.id.startsWith("humaaan-"));
+  // Two of the 32 draw a turban through a mask, which the converter refuses rather than draws wrong.
+  assert.deepEqual(result.sets.people.dropped, { use: 2 });
+  assert.equal(figures.length, 30);
+  const standing = figures.filter((drawing) => drawing.tags.includes("standing"));
+  const sitting = figures.filter((drawing) => drawing.tags.includes("sitting"));
+  assert.deepEqual([standing.length, sitting.length], [22, 8]);
+  for (const drawing of figures) {
+    assert.deepEqual(drawing.tags.slice(0, 4), ["person", "full body", drawing.id.split("-")[1], "humaaans"], drawing.id);
+    assert.match(drawing.name, /^(Standing|Sitting), [a-z]/, drawing.id);
+    // Flat colour figures, not Open Peeps' black line on white.
+    assert.ok(new Set(drawing.art.paths.map((part) => part.fill)).size >= 4, drawing.id);
+  }
+  // After the busts and faces, apart from the two the overview features.
+  const rest = people.slice(8);
+  const first = rest.findIndex((drawing) => drawing.id.startsWith("humaaan-"));
+  assert.ok(rest.slice(first).every((drawing) => drawing.id.startsWith("humaaan-")));
+  const byId = new Map(figures.map((drawing) => [drawing.id, drawing]));
+  assert.equal(byId.get("humaaan-sitting-3")?.name, "Sitting, beard, in a wheelchair");
+  assert.ok(byId.get("humaaan-sitting-3").tags.includes("wheelchair"));
+  // A standing figure is taller than it is wide, and fitted to its shapes rather than the 380 by 480 artboard.
+  const { w, h } = byId.get("humaaan-standing-1").art;
+  assert.ok(h > w && w < 380 && h < 480, `${w} by ${h}`);
 });
 
 test("doodles keep Open Doodles' black ink and pink accent, named after their files", () => {
@@ -224,6 +251,8 @@ test("the licence file names each set's source and terms", () => {
     "Simple Icons", "CC0 1.0", "simpleicons.org", "brand guidelines", "Phosphor", "Copyright (c) 2023 Phosphor Icons",
     "Fluent Emoji", "Copyright (c) Microsoft Corporation.", "Permission is hereby granted, free of charge",
     "## People (people.json)", "Open Peeps by Pablo Stanley", "https://www.openpeeps.com", "@dicebear/open-peeps",
+    "Humaaans by Pablo Stanley", "CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/",
+    "https://github.com/Calinou/humaaans at commit 818f184",
     "## Doodles (doodles.json)", "Open Doodles by Pablo Stanley", "https://www.opendoodles.com", "react-open-doodles",
     "https://creativecommons.org/publicdomain/zero/1.0/",
   ]) {

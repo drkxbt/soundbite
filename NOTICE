@@ -35,7 +35,10 @@ is offered only so a clip can say where to find the show, and none of those comp
 project. The icons are Phosphor Icons (phosphoricons.com, MIT) and the emoji are Microsoft's Fluent Emoji in the flat
 style (github.com/microsoft/fluentui-emoji, MIT). The people and faces are Open Peeps and the doodles Open Doodles,
 both by Pablo Stanley (openpeeps.com, opendoodles.com) under CC0 1.0, as packaged in @dicebear/open-peeps and
-react-open-doodles.
+react-open-doodles. The standing and sitting figures among the people are Humaaans by Pablo Stanley (humaaans.com),
+copyright 2019 Pablo Stanley, under CC BY 4.0 (creativecommons.org/licenses/by/4.0/), from the GitHub mirror
+github.com/Calinou/humaaans at commit 818f184; the source files, the full licence and humaaans/CREDITS.md are in
+humaaans/, and the build redraws each figure as path data with its shapes and colours unchanged.
 
 The 3D icons in the Elements panel are 3dicons by Vijay Verma (3dicons.co, github.com/realvjy/3dicons), dedicated to
 the public domain under CC0 1.0. The build fetches the renders from the project's own CDN and writes them, as WebP, to
