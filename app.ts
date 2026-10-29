@@ -1,4 +1,4 @@
-import { audiogram, type Drawing, type Editor, type Settings, type StockPhoto } from "@drkxbt/audiogram";
+import { audiogram, type Drawing, type Editor, type MediaFeed, type Settings, type StockPhoto } from "@drkxbt/audiogram";
 import { isSilent, SPEECH_RATE } from "./audio.js";
 import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
@@ -11,8 +11,8 @@ import type { FontEntry } from "./fonts.js";
 type PhotoEntry = Omit<StockPhoto, "url" | "thumb"> & { file: string; thumb: string };
 import { showThanks } from "./panel.js";
 import { PODCAST_TEMPLATES } from "./templates.js";
-import { liveFeeds, offeredFeeds } from "./media.js";
-import { loadPictures, savePictures } from "./pictures.js";
+import { liveFeeds, offeredFeeds, offeredKlipyFeeds } from "./media.js";
+import { keepable, loadPictures, savePictures } from "./pictures.js";
 import { Coverage, cutPoint, type Span } from "./sweep.js";
 import { createTranscriber, type Progress } from "./transcribe.js";
 
@@ -140,7 +140,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
 
   async function keep(next: Settings) {
     // The pictures as they are now, not as they were when this save was asked for.
-    if (picturesBack) void savePictures(editor.settings.images);
+    if (picturesBack) void savePictures(keepable(editor.settings.images));
     const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers, page: next.page, recent: next.recent };
     if (typeof next.theme === "number") entry.theme = next.theme;
     const picture = next.cover;
@@ -209,9 +209,10 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     // brought over from an older kit among them.
     void keep(editor.settings);
   });
-  // The free photos, bundled next to the app, read once the page has settled so they never hold up the editor.
-  // With them, the stock sources the hosting page searches for us, the ones that answer, and the bundled emoji, icons
-  // and brand logos, each read only when its section is first shown.
+  // The free photos, bundled next to the app, read once the page has settled so they never hold up the editor, and
+  // the bundled emoji, icons and brand logos, each read only when its section is first shown. The photos go in as soon
+  // as they are listed, since the templates' backdrops are made of them; the stock sources the hosting page searches
+  // for us, the ones that answer, and KLIPY follow as each arrives. KLIPY leads Stickers and GIFs.
   const photosAt = new URL("./photos/", import.meta.url);
   const drawingsAt = new URL("./drawings/", import.meta.url);
   const readDrawings = (file: string) => fetch(new URL(file, drawingsAt)).then((response) => {
@@ -219,16 +220,42 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     return response.json() as Promise<Drawing[]>;
   });
   setTimeout(() => {
-    void Promise.all([
-      fetch(new URL("photos.json", photosAt))
-        .then((response) => (response.ok ? (response.json() as Promise<PhotoEntry[]>) : []))
-        .catch((): PhotoEntry[] => []),
-      settings.media ? offeredFeeds(settings.media).then(liveFeeds) : Promise.resolve([]),
-    ]).then(([photos, media]) => editor.setLibrary({
-      photos: photos.map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
-      media,
-      drawings: DRAWING_SETS.map(([id, name]) => ({ id, name, first: () => readDrawings(`${id}.first.json`), all: () => readDrawings(`${id}.json`) })),
-    }));
+    // The same sets every time, since the editor keeps what a set has read with the set.
+    const drawings = DRAWING_SETS.map(([id, name]) => ({ id, name, first: () => readDrawings(`${id}.first.json`), all: () => readDrawings(`${id}.json`) }));
+    let photos: StockPhoto[] = [];
+    let klipy: MediaFeed[] = [];
+    let stock: MediaFeed[] = [];
+    const hand = () => editor.setLibrary({ photos, media: [...klipy, ...stock], drawings });
+    void fetch(new URL("photos.json", photosAt))
+      .then((response) => (response.ok ? (response.json() as Promise<PhotoEntry[]>) : []))
+      .catch((): PhotoEntry[] => [])
+      .then((entries) => {
+        photos = entries.map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href }));
+        hand();
+      });
+    if (settings.klipy) {
+      void offeredKlipyFeeds(settings.klipy).then((feeds) => {
+        // KLIPY leads Stickers and GIFs without a test request first (a test key allows 100 an hour), so the first one
+        // that fails, a spent or wrong key or an outage, takes it out and the other sources show in its place.
+        klipy = feeds.map((feed) => ({
+          ...feed,
+          search: (query: string, page: number) => feed.search(query, page).catch((error: unknown) => {
+            if (klipy.length) {
+              klipy = [];
+              hand();
+            }
+            throw error;
+          }),
+        }));
+        if (feeds.length) hand();
+      });
+    }
+    if (settings.media) {
+      void offeredFeeds(settings.media).then(liveFeeds).then((feeds) => {
+        stock = feeds;
+        if (feeds.length) hand();
+      });
+    }
   }, 800);
   editor.slots.actions.append(creditWrap);
   editor.slots.captions.append(redoKey);

@@ -14,12 +14,20 @@ made-up exchange read by the Microsoft David and Microsoft Zira text-to-speech v
 real Space or person.
 
 The editor's fonts come from Fontsource under the SIL Open Font License 1.1, each one's licence copied next to it in
-dist/app/fonts/. The ornaments in the podcast designs are drawn in ornaments.ts for this project. The photos in photos/
-are in the public domain (CC0), found through Openverse; photos/CREDITS.md credits each one's photographer.
+dist/app/fonts/. The photos in photos/ are in the public domain (CC0), found through Openverse and Wikimedia Commons;
+photos/CREDITS.md credits each one's photographer.
 
 Stock photos, illustrations, videos, stickers and GIFs, when the hosting page offers a search for them, come from
 Pixabay, Pexels and GIPHY under each library's own licence; the panel credits the library and the author of each one.
 None of them is bundled with this repository.
+
+The animated emoji stickers in the media panel are Google's Noto Emoji animations
+(googlefonts.github.io/noto-emoji-animation) under CC BY 4.0, and the panel credits Noto under the results. Each one is
+fetched through the hosting page when it is picked and is not part of this repository.
+
+The KLIPY stickers and GIFs in the media panel, when the hosting page hands Soundbite a KLIPY app key, are searched
+from the visitor's browser and fetched from KLIPY (klipy.com) when they are picked, under KLIPY's terms, and the panel
+credits KLIPY under the results. None of them is part of this repository.
 
 The drawings in the Elements panel are written to dist/app/drawings/ at build time, with a licence file covering all
 three sets. The brand logos come from Simple Icons (simpleicons.org) under CC0 1.0; each mark belongs to its owner and

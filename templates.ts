@@ -1,12 +1,10 @@
-/* Twenty ready-made looks for podcast and live audio clips, in a classic and quietly luxurious manner: jewel and paper
-   grounds, gilt rules and ornaments, high-contrast serifs and wide-set capitals, each laid out for every frame shape the
-   editor offers. A template is only layers, so once it is picked every part of it can be moved, restyled or deleted,
-   and the words on its labels are sample copy for the user to change. Free of the DOM, so it can be tested on its own. */
-import { FRAME_SIZES, type Art, type Layer, type LayerKind, type Layout, type Page, type Paint, type Template } from "@drkxbt/audiogram";
-import {
-  archBorder, beadRing, border, cartouche, crown, decoCorner, decoFan, decoWings, divider, fleurDeLis, flourishCorner, hedera, laurelSprig, laurelWreath,
-  marbleVeins, ribbonMic, rings, rosette, scrollDivider, sparkles, spineBand, sunburst, taperedRule, trellis, waxSeal, type BorderStyle,
-} from "./ornaments.js";
+/* Sixteen ready-made looks for podcast and live audio clips, in a quiet modern manner: a single-tone photo carrying the
+   mood, frosted glass floating over it, thin labels, a ring of dots or a dot-matrix clock for the time, a row of small
+   stats. Each is laid out for every frame shape the editor offers. A template is only layers, so once it is picked
+   every part of it can be moved, restyled or deleted, and the words on its labels are sample copy for the user to
+   change. Free of the DOM, so it can be tested on its own. */
+import { FRAME_SIZES, type Adjust, type Clock, type Crop, type Layer, type LayerKind, type Layout, type Page, type Template } from "@drkxbt/audiogram";
+import { GLYPHS, type GlyphName } from "./glyphs.js";
 
 /** A design the user can start a clip from, laid out for whichever frame shape they picked. */
 export interface TemplateChoice {
@@ -17,37 +15,23 @@ export interface TemplateChoice {
 
 type Style = Partial<Omit<Layer, "id" | "kind" | "x" | "y" | "w" | "h">>;
 
-// Places in THEMES. A template sets every colour it can, but the theme still paints the avatar when there is no photo
-// and the words of a caption not yet said, so each template names a theme whose muted colour reads on its page.
+// Places in THEMES. A template sets every colour it uses, but a layer the user adds later takes the theme's, so each
+// template names the theme whose words read on its page.
 const INK = 0;
 const PAPER = 1;
-const MINT = 2;
-const DUSK = 3;
-const EMBER = 4;
 
-// The painter lays a metal across a layer's box as polished light; a caption's highlight stays a flat colour, since
-// the word on it takes black or white by how light it is.
-const GOLD = "metal:gold";
-const ROSE = "metal:rose";
-const SILVER = "metal:silver";
-const BRONZE = "metal:bronze";
-const CHAMPAGNE = "metal:champagne";
+const INTER = "Inter Variable";
+const DM_SANS = "DM Sans Variable";
+const OUTFIT = "Outfit Variable";
+const GROTESK = "Space Grotesk Variable";
+const BRICOLAGE = "Bricolage Grotesque Variable";
+const ARCHIVO = "Archivo Variable";
+const SERIF = "Instrument Serif";
+// Dot-matrix figures for the clocks. Handjet rather than Doto: Doto's colon is two crosses of dots and its % an X,
+// so a clock read "0‡16" and a count "27X". Its dots only read from about 48px up.
+const DOTS = "Handjet Variable";
 
-const CINZEL = "Cinzel Variable";
-const CINZEL_DECO = "Cinzel Decorative";
-const CORMORANT = "Cormorant Garamond Variable";
-const PLAYFAIR = "Playfair Display Variable";
-const BODONI = "Bodoni Moda Variable";
-const BASKERVILLE = "Libre Baskerville";
-const TENOR = "Tenor Sans";
-const MARCELLUS = "Marcellus";
-const PRATA = "Prata";
-const ITALIANA = "Italiana";
-const GILDA = "Gilda Display";
-const LIMELIGHT = "Limelight";
-const INSTRUMENT = "Instrument Serif";
-const PINYON = "Pinyon Script";
-const VIBES = "Great Vibes";
+const WHITE = "#ffffff";
 
 /** A frame shape being laid out in its own pixels; the layers keep their boxes as fractions of it, as the editor does. */
 interface Frame {
@@ -65,6 +49,8 @@ interface Frame {
   add(kind: LayerKind, name: string, x: number, y: number, w: number, h: number, style?: Style): void;
   /** How tall `count` lines of words at `size` stand. */
   lines(size: number, count?: number, spacing?: number): number;
+  /** Design pixels in this frame's pixels. */
+  px(length: number): number;
 }
 
 function template(id: string, name: string, page: Page, theme: number, draw: (frame: Frame) => void): TemplateChoice {
@@ -84,12 +70,12 @@ function template(id: string, name: string, page: Page, theme: number, draw: (fr
         tall: layout === "story",
         by: (values) => values[layout],
         add: (kind, name, x, y, w, h, style = {}) => {
-          // A label's box hugs its words, so it can be picked and moved by what shows of it. Without the speaker's
-          // photo, the portrait is their initial on gold rather than on the theme's accent, which suits no design here.
-          const fit = kind === "text" ? { autoWidth: true } : kind === "avatar" ? { fill: "metal:gold" } : {};
+          // A label's box hugs its words, so it can be picked and moved by what shows of it.
+          const fit = kind === "text" ? { autoWidth: true } : {};
           layers.push({ id: `${kind}-${name}`, kind, x: x / width, y: y / height, w: w / width, h: h / height, rotation: 0, opacity: 1, ...fit, ...style });
         },
         lines: (size, count = 1, spacing = 1.15) => size * unit * spacing * count,
+        px: (length) => length * unit,
       });
       return { layers, page: { ...page }, theme };
     },
@@ -97,18 +83,20 @@ function template(id: string, name: string, page: Page, theme: number, draw: (fr
 }
 
 /** The part of the frame words keep to: the margin all round, and on a story the bands the apps cover at top and foot. */
-function area(f: Frame, inset = 1) {
-  const left = f.pad * inset;
-  const top = f.tall ? f.height * 0.1 : f.pad * inset;
-  const bottom = f.tall ? f.height * 0.85 : f.height - f.pad * inset;
-  return { left, right: f.width - left, top, bottom, cx: f.width / 2, w: f.width - left * 2 };
+function area(f: Frame) {
+  const left = f.pad;
+  const top = f.tall ? f.height * 0.1 : f.pad;
+  const bottom = f.tall ? f.height * 0.85 : f.height - f.pad;
+  return { left, right: f.width - left, top, bottom, cx: f.width / 2, w: f.width - left * 2, h: bottom - top };
 }
 
-/** A run across the frame for a stack of blocks: its left edge and its width. */
+/** A run across the frame for a stack of blocks: its left edge and its width, in frame pixels. */
 interface Column {
   x: number;
   w: number;
 }
+
+const column = (left: number, right: number): Column => ({ x: left, w: right - left });
 
 /** Part of a stack: its height, the space before it, and how it lays itself down once it knows where it starts. A
  *  flexible block takes a share of the height the others leave, by its weight. */
@@ -119,12 +107,18 @@ interface Block {
   draw(y: number, h: number): void;
 }
 
+type Blocks = Array<Block | false>;
+
+const present = (blocks: Blocks) => blocks.filter((block): block is Block => Boolean(block));
+
+/** How tall a stack of blocks stands with no room to spare. */
+const measure = (blocks: Blocks) => present(blocks).reduce((sum, block) => sum + block.h + block.gap, 0);
+
 /** Blocks laid down a column from `top` to `bottom`; the height left over goes to the flexible ones, or above and
  *  below the whole stack when none is, so it sits in the middle. */
-function stack(top: number, bottom: number, blocks: Array<Block | false>): void {
-  const list = blocks.filter((block): block is Block => Boolean(block));
-  const used = list.reduce((sum, block) => sum + block.h + block.gap, 0);
-  const spare = Math.max(0, bottom - top - used);
+function stack(top: number, bottom: number, blocks: Blocks): void {
+  const list = present(blocks);
+  const spare = Math.max(0, bottom - top - measure(list));
   const weight = list.reduce((sum, block) => sum + (block.flex ?? 0), 0);
   let y = top + (weight ? 0 : spare / 2);
   for (const block of list) {
@@ -136,1168 +130,967 @@ function stack(top: number, bottom: number, blocks: Array<Block | false>): void 
 }
 
 /** Room that soaks up a share of what the stack leaves over, to hold the parts round it apart. */
-function space(flex = 1): Block {
-  return { h: 0, gap: 0, flex, draw: () => {} };
+const space = (flex = 1): Block => ({ h: 0, gap: 0, flex, draw: () => {} });
+
+/** A block of a fixed height, drawn by `draw` once its place is known. */
+const row = (f: Frame, h: number, gap: number, draw: (y: number, h: number) => void): Block => ({ h: f.px(h), gap: f.px(gap), draw });
+
+/** The page's photo from the bundled library, toned, covering the frame under everything else. */
+interface PhotoLook {
+  filter?: string;
+  adjust?: Adjust;
+  crop?: Crop;
+  loop?: Style["loop"];
 }
 
-/** One line of a label across the column, centred unless the style says otherwise. */
-function label(f: Frame, c: Column, name: string, text: string, style: Style, gap = 0): Block {
-  const h = f.lines(style.size ?? 24, 1, style.lineHeight ?? 1.25);
-  return { h, gap: gap * f.unit, draw: (y) => f.add("text", name, c.x, y, c.w, h, { text, align: "center", lineHeight: 1.25, ...style }) };
+function backdrop(f: Frame, id: string, look: PhotoLook = {}): void {
+  f.add("image", "photo", 0, 0, f.width, f.height, { image: `photo:${id}`, backdrop: true, mask: "rect", ...look });
+}
+
+/** A library photo in a panel of its own, cut to its box. */
+function panel(f: Frame, id: string, x: number, y: number, w: number, h: number, look: PhotoLook & { corner?: number } = {}): void {
+  const { corner = 0, ...tone } = look;
+  f.add("image", "photo", x, y, w, h, { image: `photo:${id}`, mask: "rect", radius: round(f.px(corner) / Math.min(w, h)), ...tone });
+}
+
+const round = (value: number) => Math.round(value * 10000) / 10000;
+
+/**
+ * Frosted glass: what lies under it shows through blurred by `frost`, tinted by `tint` as strongly as `strength`, with
+ * a hairline round its edge where it catches the light and a soft shadow under it. Corners are in design pixels, so
+ * they stay the same size whatever the card's.
+ */
+interface Glass {
+  tint: string;
+  strength: number;
+  frost: number;
+  corner: number;
+  edge?: number;
+  shadow?: boolean;
+}
+
+function glass(f: Frame, name: string, x: number, y: number, w: number, h: number, look: Glass, style: Style = {}): void {
+  f.add("shape", name, x, y, w, h, {
+    shape: "rect",
+    radius: Math.min(0.5, round(f.px(look.corner) / Math.min(w, h))),
+    fill: look.tint,
+    opacity: look.strength,
+    frost: look.frost,
+    shadow: look.shadow ?? true,
+    stroke: WHITE,
+    strokeWidth: look.edge ?? 1.5,
+    ...style,
+  });
+}
+
+/** A glass card `w` wide at `x`, as tall as its blocks and `inset` design pixels round them, its top at `y`. */
+function card(f: Frame, name: string, x: number, y: number, w: number, inset: number, look: Glass, blocks: Blocks, style: Style = {}): number {
+  const h = measure(blocks) + f.px(inset) * 2;
+  glass(f, name, x, y, w, h, look, style);
+  stack(y + f.px(inset), y + h - f.px(inset), blocks);
+  return h;
+}
+
+/** How the speaker's photo looks without one: their initial in `ink` on `fill`; `rim` rings it with a hairline. */
+interface Portrait {
+  fill: string;
+  ink: string;
+  rim?: string;
+}
+
+function avatarAt(f: Frame, cx: number, cy: number, d: number, look: Portrait, style: Style = {}): void {
+  const side = f.px(d);
+  if (look.rim) {
+    const r = side / 2 + f.px(5);
+    f.add("shape", "rim", cx - r, cy - r, r * 2, r * 2, { shape: "ellipse", fill: look.rim, opacity: 0.45, ...style });
+  }
+  f.add("avatar", "main", cx - side / 2, cy - side / 2, side, side, { fill: look.fill, color: look.ink, ...style });
 }
 
 /** The clip's title, room for `count` lines of it. */
 function heading(f: Frame, c: Column, style: Style, count = 2, gap = 0): Block {
-  const h = f.lines(style.size ?? 50, count, style.lineHeight ?? 1.15);
-  return { h, gap: gap * f.unit, draw: (y) => f.add("title", "main", c.x, y, c.w, h, { align: "center", ...style }) };
-}
-
-/** A drawing `w` design pixels wide, centred on `cx`, as tall as its own shape makes it. */
-function ornament(f: Frame, cx: number, name: string, art: Art, w: number, style: Style, gap = 0): Block {
-  const width = w * f.unit;
-  const h = (width * art.h) / art.w;
-  return { h, gap: gap * f.unit, draw: (y) => f.add("graphic", name, cx - width / 2, y, width, h, { art, ...style }) };
-}
-
-/** A fine straight rule `w` design pixels long, centred on `cx`. */
-function rule(f: Frame, cx: number, name: string, w: number, paint: Paint, weight = 1.5, gap = 0): Block {
-  const h = 10 * f.unit;
-  return { h, gap: gap * f.unit, draw: (y) => f.add("shape", name, cx - (w * f.unit) / 2, y, w * f.unit, h, { shape: "line", fill: paint, strokeWidth: weight }) };
-}
-
-/** A rule down the frame, for the seam between two columns. */
-function upright(f: Frame, name: string, x: number, top: number, bottom: number, paint: Paint, opacity = 1): void {
-  f.add("shape", name, x - 0.75 * f.unit, top, 1.5 * f.unit, bottom - top, { shape: "rect", fill: paint, opacity });
-}
-
-interface CameoStyle {
-  /** A solid rim round the photo, and how thick it is. */
-  rim?: Paint;
-  rimWidth?: number;
-  /** A drawing round it, `scale` times as wide as the photo. */
-  halo?: Art;
-  scale?: number;
-  haloColor?: Paint;
-  loop?: Style["loop"];
-}
-
-/** How much height a cameo of a photo `d` design pixels across takes, its rim and its drawing included. */
-function cameoHeight(f: Frame, d: number, style: CameoStyle): number {
-  const rim = d + (style.rimWidth ?? 6) * 2 * (style.rim ? 1 : 0);
-  const halo = style.halo ? d * (style.scale ?? 1.36) * (style.halo.h / style.halo.w) : 0;
-  return Math.max(rim, halo) * f.unit;
-}
-
-/** The speaker's photo framed as a cameo centred on a point: the drawing round it first, then its rim, then the photo,
- *  all turning slowly together when they loop. */
-function cameoAt(f: Frame, cx: number, cy: number, d: number, style: CameoStyle): void {
-  const side = d * f.unit;
-  const motion: Style = style.loop ? { loop: style.loop } : {};
-  if (style.halo) {
-    const w = side * (style.scale ?? 1.36);
-    const h = (w * style.halo.h) / style.halo.w;
-    f.add("graphic", "halo", cx - w / 2, cy - h / 2, w, h, { art: style.halo, color: style.haloColor ?? GOLD, ...motion });
-  }
-  if (style.rim) {
-    const r = side / 2 + (style.rimWidth ?? 6) * f.unit;
-    f.add("shape", "rim", cx - r, cy - r, r * 2, r * 2, { shape: "ellipse", fill: style.rim, ...motion });
-  }
-  f.add("avatar", "main", cx - side / 2, cy - side / 2, side, side, motion);
-}
-
-function cameo(f: Frame, cx: number, d: number, style: CameoStyle, gap = 0): Block {
-  const h = cameoHeight(f, d, style);
-  return { h, gap: gap * f.unit, draw: (y) => cameoAt(f, cx, y + h / 2, d, style) };
-}
-
-/** The speaker's name and handle, one over the other. */
-function names(f: Frame, c: Column, name: Style, handle: Style | null, gap = 0): Block {
-  const nameH = f.lines(name.size ?? 30, 1, 1.35);
-  const handleH = handle ? f.lines(handle.size ?? 22, 1, 1.35) : 0;
-  return {
-    h: nameH + handleH,
-    gap: gap * f.unit,
-    draw: (y) => {
-      f.add("name", "main", c.x, y, c.w, nameH, { align: "center", ...name });
-      if (handle) f.add("handle", "main", c.x, y + nameH, c.w, handleH, { align: "center", ...handle });
-    },
-  };
-}
-
-/** The photo with the name over the handle beside it, as one row `w` wide from `x`. */
-function byline(f: Frame, x: number, w: number, d: number, name: Style, handle: Style, frame: CameoStyle = {}, gap = 0): Block {
-  const h = cameoHeight(f, d, frame);
-  return {
-    h,
-    gap: gap * f.unit,
-    draw: (y) => {
-      cameoAt(f, x + h / 2, y + h / 2, d, frame);
-      const nameH = f.lines(name.size ?? 26, 1, 1.4);
-      const handleH = f.lines(handle.size ?? 22, 1, 1.3);
-      const top = y + (h - nameH - handleH) / 2;
-      const textX = x + h + 20 * f.unit;
-      f.add("name", "main", textX, top, x + w - textX, nameH, { ...name, align: "left" });
-      f.add("handle", "main", textX, top + nameH, x + w - textX, handleH, { ...handle, align: "left" });
-    },
-  };
+  const spacing = style.lineHeight ?? 1.15;
+  const h = f.lines(style.size ?? 50, count, spacing) + f.px(2);
+  return { h, gap: f.px(gap), draw: (y) => f.add("title", "main", c.x, y, c.w, h, { align: "left", ...style, lineHeight: spacing }) };
 }
 
 /** The captions, room for `count` lines; a flexible one also takes a share of the spare height. */
 function captions(f: Frame, c: Column, style: Style, count = 3, gap = 0, flex = 0): Block {
   // A hair over the lines asked for, so the painter's count of the lines that fit never rounds one away.
-  const h = f.lines(style.size ?? 60, count + 0.1, style.lineHeight ?? 1.34);
-  return { h, gap: gap * f.unit, flex, draw: (y, height) => f.add("captions", "main", c.x, y, c.w, height, { align: "center", ...style }) };
+  const h = f.lines(style.size ?? 56, count + 0.1, style.lineHeight ?? 1.3);
+  return { h, gap: f.px(gap), flex, draw: (y, height) => f.add("captions", "main", c.x, y, c.w, height, { align: "left", lineHeight: 1.3, ...style }) };
 }
 
-/** The sound, `w` by `h` design pixels, centred on `cx`. */
-function sound(f: Frame, cx: number, w: number, h: number, style: Style, gap = 0): Block {
-  const width = w * f.unit;
-  return { h: h * f.unit, gap: gap * f.unit, draw: (y) => f.add("visual", "main", cx - width / 2, y, width, h * f.unit, { visual: "bars", ...style }) };
+/** A hairline across the column. */
+function rule(f: Frame, c: Column, name: string, color: string, opacity: number, gap = 0): Block {
+  return row(f, 8, gap, (y, h) => f.add("shape", name, c.x, y, c.w, h, { shape: "line", fill: color, strokeWidth: 1.5, opacity }));
 }
 
-/** The time through the clip, on one line. */
-function clock(f: Frame, c: Column, style: Style, gap = 0): Block {
-  const h = f.lines(style.size ?? 20, 1, 1.4);
-  return { h, gap: gap * f.unit, draw: (y) => f.add("time", "main", c.x, y, c.w, h, { align: "center", ...style }) };
-}
-
-/** The links the user gave, on one line. */
-function links(f: Frame, c: Column, style: Style, gap = 0): Block {
-  const h = f.lines(style.size ?? 20, 1, 1.4);
-  return { h, gap: gap * f.unit, draw: (y) => f.add("links", "main", c.x, y, c.w, h, { align: "center", ...style }) };
-}
-
-/** A ruled border all round the frame, `inset` design pixels in from its edges. */
-function frameBorder(f: Frame, inset: number, style: BorderStyle, color: Paint, opacity = 1): void {
-  const i = inset * f.unit;
-  const w = f.width - i * 2;
-  const h = f.height - i * 2;
-  f.add("graphic", "border", i, i, w, h, { art: border(Math.round(w), Math.round(h), style), color, opacity });
-}
-
-/** A corner drawing in each corner of a box, turned over for each, `size` design pixels square. */
-function corners(f: Frame, art: Art, x: number, y: number, w: number, h: number, size: number, style: Style): void {
-  const s = size * f.unit;
-  f.add("graphic", "corner-tl", x, y, s, s, { art, ...style });
-  f.add("graphic", "corner-tr", x + w - s, y, s, s, { art, flipX: true, ...style });
-  f.add("graphic", "corner-bl", x, y + h - s, s, s, { art, flipY: true, ...style });
-  f.add("graphic", "corner-br", x + w - s, y + h - s, s, s, { art, flipX: true, flipY: true, ...style });
-}
-
-/** The column a stack runs down, the full width of the area or a share of it. */
-function columnOf(left: number, right: number): Column {
-  return { x: left, w: right - left };
-}
-
-/** A label on the left of a row and its partner on the right, sharing a line. */
-function pair(f: Frame, c: Column, ids: [string, string], texts: [string, string], style: Style, gap = 0): Block {
-  const h = f.lines(style.size ?? 20, 1, 1.25);
+/** The speaker's photo at the left of a row, their name over their handle beside it. */
+function byline(f: Frame, c: Column, d: number, portrait: Portrait, name: Style, handle: Style | null, gap = 0, extra?: (y: number, h: number) => void): Block {
+  const nameH = f.lines(name.size ?? 30, 1, 1.3);
+  const handleH = handle ? f.lines(handle.size ?? 24, 1, 1.3) : 0;
+  const h = Math.max(f.px(d), nameH + handleH);
   return {
     h,
-    gap: gap * f.unit,
+    gap: f.px(gap),
     draw: (y) => {
-      f.add("text", ids[0], c.x, y, c.w / 2, h, { text: texts[0], align: "left", lineHeight: 1.25, ...style });
-      f.add("text", ids[1], c.x + c.w / 2, y, c.w / 2, h, { text: texts[1], align: "right", lineHeight: 1.25, ...style });
+      avatarAt(f, c.x + f.px(d) / 2, y + h / 2, d, portrait);
+      const x = c.x + f.px(d) + f.px(22);
+      const top = y + (h - nameH - handleH) / 2;
+      f.add("name", "main", x, top, c.x + c.w - x, nameH, { align: "left", ...name });
+      if (handle) f.add("handle", "main", x, top + nameH, c.x + c.w - x, handleH, { align: "left", ...handle });
+      extra?.(y, h);
     },
   };
 }
 
-/** Navy and gold for a royal warrant: a crown over the speaker set in a cameo of beads, a stepped double border. */
-const royalCrest = template("royal-crest", "Royal Crest", { color: "#17284d", to: "#080f22", angle: 180 }, DUSK, (f) => {
-  const a = area(f);
-  const ivory = "#f3ead7";
-  const soft = "#9da9c6";
-  frameBorder(f, f.pad * 0.36, { gap: 12, outer: 2, inner: 1, corner: "step", cut: 30 }, GOLD, 0.9);
-  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: GOLD, uppercase: true, letterSpacing: 420, enter: "fade" };
-  const title: Style = { font: CINZEL, size: f.by({ square: 44, portrait: 52, story: 52, landscape: 54 }), weight: 600, color: GOLD, lineHeight: 1.14, letterSpacing: 30, enter: "glide", loop: "shimmer" };
-  const name: Style = { font: CINZEL, size: 28, weight: 600, color: ivory, letterSpacing: 80 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.28 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: beadRing(), scale: 1.34, loop: "slowZoom" };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+/** How tall the room for two lines of a title is: a hair over, so the painter's count of the lines that fit never
+ *  rounds one away. */
+const titleRoom = (f: Frame, size: number, spacing: number) => f.lines(size, 2, spacing) + f.px(2);
 
-  if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.38);
-    const right = columnOf(f.width * 0.44, a.right - 40);
-    stack(a.top, a.bottom, [ornament(f, left.x + left.w / 2, "crown", crown(), 150, { color: GOLD, enter: "fade" }), cameo(f, left.x + left.w / 2, 280, frame, 30), names(f, left, name, handle, 28)]);
-    upright(f, "seam", f.width * 0.41, a.top + 40, a.bottom - 40, GOLD, 0.55);
-    stack(a.top, a.bottom, [
-      label(f, right, "kicker", "Episode XII", kicker),
-      heading(f, right, title, 2, 18),
-      ornament(f, right.x + right.w / 2, "divider", divider(), 420, { color: GOLD }, 18),
-      space(), captions(f, right, words, 3, 18), space(),
-      sound(f, right.x + right.w / 2, 520, 70, { color: GOLD }, 18),
-      clock(f, right, time, 12),
-    ]);
-    return;
-  }
-  const c = columnOf(a.left + 20, a.right - 20);
-  stack(a.top, a.bottom, [
-    ornament(f, a.cx, "crown", crown(), f.by({ square: 104, portrait: 132, story: 168, landscape: 0 }), { color: GOLD, enter: "fade" }),
-    label(f, c, "kicker", "Episode XII", kicker, 18),
-    heading(f, c, title, 2, 12),
-    cameo(f, a.cx, f.by({ square: 112, portrait: 168, story: 236, landscape: 0 }), frame, f.by({ square: 22, portrait: 34, story: 52, landscape: 0 })),
-    names(f, c, name, handle, 18),
-    space(), captions(f, c, words, 3, f.by({ square: 16, portrait: 26, story: 40, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 360, portrait: 420, story: 480, landscape: 0 }), f.by({ square: 48, portrait: 64, story: 84, landscape: 0 }), { color: GOLD }, 16),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** A slate gallery wall and a gilt picture frame round the words, its corners cut in, a jewel in each. */
-const gildedFrame = template("gilded-frame", "Gilded Frame", { color: "#252e38", to: "#11161c", angle: 180 }, DUSK, (f) => {
-  const a = area(f);
-  const ivory = "#f1ead9";
-  const soft = "#a3adb8";
-  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: GOLD, uppercase: true, letterSpacing: 400 };
-  const title: Style = { font: PLAYFAIR, size: f.by({ square: 46, portrait: 54, story: 54, landscape: 56 }), weight: 500, color: ivory, lineHeight: 1.12, enter: "glide" };
-  const name: Style = { font: PLAYFAIR, size: 28, weight: 600, color: ivory };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
-  const words: Style = { font: PLAYFAIR, size: f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), weight: 500, color: ivory, highlight: "#e8d5a3", lineHeight: 1.32 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 4 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
-  const gilt = (x: number, y: number, w: number, h: number) => {
-    f.add("graphic", "frame", x, y, w, h, { art: border(Math.round(w), Math.round(h), { gap: 16, outer: 7, inner: 1.5, corner: "round", cut: 34, jewels: "corners" }), color: GOLD, enter: "iris" });
-  };
-
-  if (f.wide) {
-    const head = columnOf(a.left, a.right);
-    const titleH = f.lines(title.size!, 1, 1.12);
-    f.add("text", "kicker", head.x, a.top, head.w, f.lines(19, 1, 1.25), { text: "Episode XII", align: "center", lineHeight: 1.25, ...kicker });
-    f.add("title", "main", head.x, a.top + 44, head.w, titleH, { align: "center", ...title });
-    const frameY = a.top + 44 + titleH + 36;
-    const frameH = a.bottom - frameY;
-    const frameX = a.left + 60;
-    const frameW = a.w - 120;
-    gilt(frameX, frameY, frameW, frameH);
-    const inside = columnOf(frameX + 110, frameX + frameW - 110);
-    const side = 300;
-    stack(frameY + 60, frameY + frameH - 60, [cameo(f, inside.x + side / 2, 150, frame), names(f, columnOf(inside.x, inside.x + side), name, handle, 18), sound(f, inside.x + side / 2, 240, 50, { color: CHAMPAGNE }, 26), clock(f, columnOf(inside.x, inside.x + side), time, 8)]);
-    const words2 = columnOf(inside.x + side + 70, inside.x + inside.w);
-    stack(frameY + 60, frameY + frameH - 60, [space(), captions(f, words2, words, 4), space()]);
-    return;
-  }
-  const c = columnOf(a.left, a.right);
-  const kickerH = f.lines(19, 1, 1.25);
-  const titleH = f.lines(title.size!, 2, 1.12);
-  f.add("text", "kicker", c.x, a.top, c.w, kickerH, { text: "Episode XII", align: "center", lineHeight: 1.25, ...kicker });
-  f.add("title", "main", c.x, a.top + kickerH + 14, c.w, titleH, { align: "center", ...title });
-  const frameY = a.top + kickerH + 14 + titleH + f.by({ square: 26, portrait: 36, story: 52, landscape: 0 });
-  const frameH = a.bottom - frameY;
-  const frameX = a.left - 10;
-  const frameW = a.w + 20;
-  gilt(frameX, frameY, frameW, frameH);
-  const inside = columnOf(frameX + 80, frameX + frameW - 80);
-  stack(frameY + f.by({ square: 56, portrait: 70, story: 96, landscape: 0 }), frameY + frameH - f.by({ square: 50, portrait: 64, story: 90, landscape: 0 }), [
-    cameo(f, a.cx, f.by({ square: 96, portrait: 150, story: 220, landscape: 0 }), frame),
-    names(f, inside, name, handle, 14),
-    ornament(f, a.cx, "rule", taperedRule(), 300, { color: GOLD }, f.by({ square: 14, portrait: 24, story: 36, landscape: 0 })),
-    space(), captions(f, inside, words, 3, 14), space(),
-    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 70, landscape: 0 }), { color: CHAMPAGNE }, 14),
-    clock(f, inside, time, 8),
-  ]);
-});
-
-/** A green salon papered in a gilt trellis: a script greeting, the words on a quiet panel framed in gold. */
-const emeraldSalon = template("emerald-salon", "Emerald Salon", { color: "#0f4d3c", to: "#06271e", angle: 180 }, MINT, (f) => {
-  const a = area(f);
-  const ivory = "#f4ecd8";
-  const soft = "#9fcbb8";
-  f.add("graphic", "trellis", 0, 0, f.width, f.height, { art: trellis(f.width, f.height, f.by({ square: 96, portrait: 96, story: 110, landscape: 110 })), color: GOLD, opacity: 0.1 });
-  const script: Style = { font: PINYON, size: f.by({ square: 58, portrait: 66, story: 78, landscape: 70 }), color: GOLD, lineHeight: 1.3, enter: "fade" };
-  const title: Style = { font: BODONI, size: f.by({ square: 44, portrait: 50, story: 50, landscape: 42 }), weight: 600, color: ivory, lineHeight: 1.12, uppercase: true, letterSpacing: 60, enter: "glide" };
-  const name: Style = { font: BODONI, size: 27, weight: 600, color: ivory, uppercase: true, letterSpacing: 120 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
-  const words: Style = { font: BASKERVILLE, size: f.by({ square: 52, portrait: 60, story: 66, landscape: 56 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.4 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 4, halo: rings([196, 2], [182, 1]), scale: 1.3 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
-  const panel = (x: number, y: number, w: number, h: number) => {
-    f.add("shape", "panel", x, y, w, h, { shape: "rect", fill: "#0a3a2d", stroke: GOLD, strokeWidth: 2 });
-    f.add("graphic", "panel-rule", x + 12, y + 12, w - 24, h - 24, { art: border(Math.round(w - 24), Math.round(h - 24), { gap: 0, outer: 1 }), color: GOLD, opacity: 0.7 });
-  };
-
-  if (f.wide) {
-    const left = columnOf(a.left, f.width * 0.42);
-    stack(a.top, a.bottom, [
-      label(f, left, "script", "In conversation", script),
-      heading(f, left, title, 2, 6),
-      cameo(f, left.x + left.w / 2, 190, frame, 36),
-      names(f, left, name, handle, 20),
-      clock(f, left, time, 14),
-    ]);
-    const px = f.width * 0.47;
-    const pw = a.right - px;
-    panel(px, a.top, pw, a.bottom - a.top);
-    const inside = columnOf(px + 70, px + pw - 70);
-    stack(a.top + 60, a.bottom - 50, [space(), captions(f, inside, words, 4), space(), sound(f, inside.x + inside.w / 2, 480, 64, { color: GOLD }, 30)]);
-    return;
-  }
-  const c = columnOf(a.left, a.right);
-  const panelGap = f.by({ square: 22, portrait: 30, story: 44, landscape: 0 });
-  const panelH = f.by({ square: 300, portrait: 380, story: 560, landscape: 0 });
-  stack(a.top, a.bottom, [
-    label(f, c, "script", "In conversation", script),
-    heading(f, c, title, 2, 2),
-    cameo(f, a.cx, f.by({ square: 100, portrait: 140, story: 200, landscape: 0 }), frame, f.by({ square: 20, portrait: 30, story: 46, landscape: 0 })),
-    names(f, c, name, handle, 14),
-    {
-      h: panelH,
-      gap: panelGap,
-      flex: 1,
-      draw: (y, h) => {
-        panel(a.left, y, a.w, h);
-        const inside = columnOf(a.left + 56, a.right - 56);
-        stack(y + 36, y + h - 30, [space(), captions(f, inside, words, 3), space(), sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 52, story: 70, landscape: 0 }), { color: GOLD }, 14)]);
-      },
+/** The speaker's name over room for two lines of the title, the speaker's photo at the top right: a card's top line.
+ *  The name goes first so a title of one line leaves its spare room below the block, not between the two. */
+function header(f: Frame, c: Column, title: Style, name: Style, d: number, portrait: Portrait, gap = 0): Block {
+  const nameH = f.lines(name.size ?? 26, 1, 1.3);
+  const titleH = titleRoom(f, title.size ?? 32, 1.2);
+  const h = Math.max(f.px(d), nameH + titleH + f.px(4));
+  return {
+    h,
+    gap: f.px(gap),
+    draw: (y) => {
+      const w = c.w - f.px(d) - f.px(24);
+      f.add("name", "main", c.x, y, w, nameH, { align: "left", ...name });
+      f.add("title", "main", c.x, y + nameH + f.px(4), w, titleH, { align: "left", ...title, lineHeight: 1.2 });
+      avatarAt(f, c.x + c.w - f.px(d) / 2, y + f.px(d) / 2, d, portrait);
     },
-    clock(f, c, time, 14),
-  ]);
-});
-
-/** A wine cellar's medal: oxblood, rose gold, the speaker set in a scalloped rosette between two laurel sprigs. */
-const bordeaux = template("bordeaux", "Bordeaux", { color: "#5c1424", to: "#2a0810", angle: 180 }, EMBER, (f) => {
-  const a = area(f);
-  const ivory = "#f7ebe4";
-  const soft = "#d9a99b";
-  frameBorder(f, f.pad * 0.4, { gap: 10, outer: 1.5, inner: 1, corner: "round", cut: 40 }, ROSE, 0.85);
-  const kicker: Style = { font: TENOR, size: 22, color: ROSE, uppercase: true, letterSpacing: 460 };
-  const title: Style = { font: PRATA, size: f.by({ square: 44, portrait: 52, story: 52, landscape: 52 }), color: ivory, lineHeight: 1.18, enter: "glide" };
-  const name: Style = { font: PRATA, size: 28, color: ivory, letterSpacing: 40 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
-  const words: Style = { font: PRATA, size: f.by({ square: 56, portrait: 64, story: 74, landscape: 62 }), color: ivory, highlight: "#efc6b4", lineHeight: 1.36 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
-  // The rosette's hole is a little over half its width, so the photo sits just inside its inner ring; a sprig of laurel
-  // reaches out from each side of it, as far as `room` allows.
-  const medal = (cx: number, d: number, room: number): Block => {
-    const w = d / 0.52;
-    const sprig = laurelSprig();
-    return {
-      h: w * f.unit,
-      gap: 0,
-      draw: (y) => {
-        const sw = Math.min(w * 0.9, (room - w) / 2 / 0.92);
-        const sh = (sw * sprig.h) / sprig.w;
-        const cy = y + (w * f.unit) / 2;
-        f.add("graphic", "sprig-left", cx - w / 2 - sw * 0.92, cy - sh / 2 + w * 0.12, sw, sh, { art: sprig, color: ROSE, flipX: true });
-        f.add("graphic", "sprig-right", cx + w / 2 - sw * 0.08, cy - sh / 2 + w * 0.12, sw, sh, { art: sprig, color: ROSE });
-        cameoAt(f, cx, cy, d, { halo: rosette(), scale: 1 / 0.52, haloColor: ROSE, loop: "slowZoom" });
-      },
-    };
   };
+}
+
+/** The sound as a ring of dots `d` across centred on `cx`, with whatever `inside` puts in its middle. */
+function ring(f: Frame, cx: number, d: number, color: string, inside: ((cy: number) => void) | null, gap = 0): Block {
+  return row(f, d, gap, (y, h) => {
+    f.add("visual", "main", cx - h / 2, y, h, h, { visual: "ring", color });
+    inside?.(y + h / 2);
+  });
+}
+
+/** A clock on one line centred on a point, `w` design pixels wide. */
+function clockAt(f: Frame, name: string, cx: number, cy: number, w: number, style: Style): void {
+  const h = f.lines(style.size ?? 40, 1, 1.2);
+  f.add("time", name, cx - f.px(w) / 2, cy - h / 2, f.px(w), h, { align: "center", ...style });
+}
+
+/** The sound as bars, `w` frame pixels wide from `x`. */
+function bars(f: Frame, x: number, w: number, h: number, color: string, gap = 0, style: Style = {}): Block {
+  return row(f, h, gap, (y, height) => f.add("visual", "main", x, y, w, height, { visual: "bars", color, ...style }));
+}
+
+/** A drawn icon from the bundled set, `size` design pixels square, in the layer's colour. */
+function icon(f: Frame, name: string, glyph: GlyphName, x: number, y: number, size: number, color: string, opacity = 1, style: Style = {}): void {
+  f.add("graphic", name, x, y, f.px(size), f.px(size), { art: GLYPHS[glyph], color, opacity, ...style });
+}
+
+/** One of a row of stats: a figure, or one of the clip's clocks, over a small icon and what the figure counts. */
+type Stat = ({ text: string } | { clock: Exclude<Clock, "both"> }) & { glyph: GlyphName; label: string };
+
+interface StatLook {
+  value: Style;
+  label: Style;
+  /** The icons' colour and how strongly they show; the labels take the same. */
+  ink: string;
+  dim: number;
+}
+
+/** Stats side by side across the column, each a figure over an icon and its label, as a status card shows them. */
+function stats(f: Frame, c: Column, items: Stat[], look: StatLook, gap = 0): Block {
+  const valueH = f.lines(look.value.size ?? 40, 1, 1.2);
+  const labelSize = look.label.size ?? 26;
+  const labelH = f.lines(labelSize, 1, 1.25);
+  const glyph = labelSize * 1.05;
+  const under = Math.max(f.px(glyph), labelH);
+  const between = f.px(12);
+  return {
+    h: valueH + between + under,
+    gap: f.px(gap),
+    draw: (y) => {
+      const step = c.w / items.length;
+      items.forEach((item, index) => {
+        const name = `stat-${index + 1}`;
+        const x = c.x + step * index;
+        const w = step - f.px(16);
+        if ("clock" in item) f.add("time", name, x, y, w, valueH, { align: "left", clock: item.clock, ...look.value });
+        else f.add("text", name, x, y, w, valueH, { text: item.text, align: "left", lineHeight: 1.2, ...look.value });
+        const top = y + valueH + between;
+        icon(f, name, item.glyph, x, top + (under - f.px(glyph)) / 2, glyph, look.ink, look.dim);
+        f.add("text", `${name}-label`, x + f.px(glyph + 10), top + (under - labelH) / 2, w - f.px(glyph + 10), labelH, { text: item.label, align: "left", lineHeight: 1.25, color: look.ink, opacity: look.dim, ...look.label });
+      });
+    },
+  };
+}
+
+// The figures a show's card carries: the episode, as sample copy plain enough that nobody exports it as a fact, and
+// the clip's own time played and left, which are always true.
+const SHOW: Stat[] = [
+  { text: "Ep. 00", glyph: "microphone", label: "Episode" },
+  { clock: "elapsed", glyph: "headphones", label: "Played" },
+  { clock: "remaining", glyph: "clock", label: "Left" },
+];
+
+// How faint a secondary line of words goes, a handle or a label: a 1080 frame shows at about a third of its size in a
+// phone's feed, so words that carry something are never fainter than this nor smaller than 26.
+const QUIET = 0.78;
+
+/* ---------------------------------------------------------------------------------------------------------------- */
+
+/** The reference itself: a lake in golden morning fog, and over it a pane of smoked glass counting the clip off in a
+ *  ring of dots round a dot-matrix percentage, three small stats along its foot, the fog left to show all round it. */
+const amberFog = template("amber-fog", "Amber Fog", { color: "#4a3a22", to: "#1f170c", angle: 180 }, INK, (f) => {
+  // Half a sepia pushed hard turns the grey fog gold; the full amber tone went mustard in the mid-tones.
+  backdrop(f, "4a139be3", { filter: "retro", adjust: { brightness: 0.9, saturation: 2 }, crop: { x: f.by({ square: 0.2, portrait: 0.25, story: 0.3, landscape: 0 }), y: 0, zoom: 1 }, loop: "slowZoom" });
+  // Smoked dark enough that the words still to come, drawn at half strength, read over the brightest of the fog.
+  const pane: Glass = { tint: "#1f0f05", strength: 0.5, frost: 30, corner: 48, edge: 2 };
+  const title: Style = { font: INTER, size: f.by({ square: 30, portrait: 32, story: 36, landscape: 34 }), weight: 600, color: WHITE };
+  const name: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 500, color: WHITE, opacity: QUIET };
+  const portrait: Portrait = { fill: "#f4e6c9", ink: "#4d3a1c" };
+  const words: Style = { font: INTER, size: f.by({ square: 46, portrait: 50, story: 58, landscape: 52 }), weight: 600, color: WHITE, highlight: WHITE, align: "center" };
+  const figures: StatLook = { value: { font: INTER, size: f.by({ square: 34, portrait: 38, story: 44, landscape: 40 }), weight: 500, color: WHITE }, label: { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 400 }, ink: WHITE, dim: QUIET };
+  const percent = (size: number) => (cx: number) => (cy: number) => clockAt(f, "main", cx, cy, size * 2.6, { clock: "percent", font: DOTS, size, weight: 300, color: WHITE });
+  const a = area(f);
 
   if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.42);
-    const right = columnOf(f.width * 0.46, a.right - 50);
-    stack(a.top, a.bottom, [medal(left.x + left.w / 2, 190, left.w), names(f, left, name, handle, 34)]);
-    stack(a.top, a.bottom, [
-      label(f, right, "kicker", "Vintage edition", kicker),
-      heading(f, right, title, 2, 16),
-      ornament(f, right.x + right.w / 2, "rule", taperedRule(), 380, { color: ROSE }, 14),
-      space(), captions(f, right, words, 3, 16), space(),
-      sound(f, right.x + right.w / 2, 480, 64, { color: ROSE }, 16),
-      clock(f, right, time, 10),
+    const x = f.px(200);
+    const y = f.px(130);
+    const w = f.width - x * 2;
+    const h = f.height - y * 2;
+    glass(f, "card", x, y, w, h, pane);
+    const left = x + f.px(340);
+    stack(y, y + h, [ring(f, left, 540, WHITE, percent(150)(left))]);
+    const right = column(x + f.px(680), x + w - f.px(64));
+    stack(y + f.px(60), y + h - f.px(60), [
+      header(f, right, title, name, 72, portrait),
+      space(),
+      captions(f, right, { ...words, align: "left" }, 3),
+      space(),
+      stats(f, right, SHOW, figures),
     ]);
     return;
   }
-  const c = columnOf(a.left + 30, a.right - 30);
-  stack(a.top, a.bottom, [
-    label(f, c, "kicker", "Vintage edition", kicker),
-    heading(f, c, title, 2, 14),
-    { ...medal(a.cx, f.by({ square: 104, portrait: 150, story: 210, landscape: 0 }), c.w), gap: f.by({ square: 18, portrait: 30, story: 48, landscape: 0 }) },
-    names(f, c, name, handle, 14),
-    space(), captions(f, c, words, 3, f.by({ square: 12, portrait: 24, story: 40, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 60, story: 80, landscape: 0 }), { color: ROSE }, 14),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** A jazz-age poster in black and gold: a fan rising behind the title, stepped corners, the title in a deco face. */
-const gatsbyDeco = template("gatsby-deco", "Gatsby Deco", { color: "#141210", to: "#070707", angle: 180 }, DUSK, (f) => {
-  const a = area(f);
-  const ivory = "#f2e8d2";
-  const soft = "#b3a68a";
-  const edge = f.pad * 0.36;
-  corners(f, decoCorner(), edge, edge, f.width - edge * 2, f.height - edge * 2, f.by({ square: 150, portrait: 170, story: 200, landscape: 170 }), { color: GOLD });
-  const kicker: Style = { font: TENOR, size: 22, color: GOLD, uppercase: true, letterSpacing: 520 };
-  const title: Style = { font: LIMELIGHT, size: f.by({ square: 48, portrait: 50, story: 50, landscape: 48 }), color: GOLD, uppercase: true, lineHeight: 1.12, letterSpacing: 60, enter: "unfold", loop: "shimmer" };
-  const name: Style = { font: TENOR, size: 24, color: ivory, uppercase: true, letterSpacing: 300 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 200 };
-  const words: Style = { font: MARCELLUS, size: f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), color: ivory, highlight: "#e2c27a", lineHeight: 1.34 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 4, halo: rings([196, 2.5], [184, 1]), scale: 1.28 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
-
-  if (f.wide) {
-    const left = columnOf(a.left + 80, f.width * 0.4);
-    const right = columnOf(f.width * 0.45, a.right - 80);
-    stack(a.top, a.bottom, [ornament(f, left.x + left.w / 2, "fan", decoFan(), 420, { color: GOLD, enter: "iris" }), cameo(f, left.x + left.w / 2, 210, frame, 28), names(f, left, name, handle, 24)]);
-    upright(f, "seam", f.width * 0.425, a.top + 60, a.bottom - 60, GOLD, 0.5);
-    stack(a.top, a.bottom, [
-      label(f, right, "kicker", "Episode XII", kicker),
-      heading(f, right, title, 2, 16),
-      rule(f, right.x + right.w / 2, "rule", 160, GOLD, 2, 16),
-      space(), captions(f, right, words, 3, 18), space(),
-      sound(f, right.x + right.w / 2, 480, 64, { color: GOLD }, 18),
-      clock(f, right, time, 10),
-    ]);
-    return;
-  }
-  const c = columnOf(a.left + 30, a.right - 30);
-  const fanW = f.by({ square: 360, portrait: 460, story: 600, landscape: 0 });
-  stack(a.top, a.bottom, [
-    ornament(f, a.cx, "fan", decoFan(), fanW, { color: GOLD, enter: "iris" }),
-    label(f, c, "kicker", "Episode XII", kicker, 18),
-    heading(f, c, title, 2, 14),
-    cameo(f, a.cx, f.by({ square: 92, portrait: 132, story: 190, landscape: 0 }), frame, f.by({ square: 20, portrait: 32, story: 48, landscape: 0 })),
-    names(f, c, name, handle, 16),
-    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 22, story: 36, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 58, story: 78, landscape: 0 }), { color: GOLD }, 14),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** A book's title page pulled on ivory: black ink, an oxblood accent, a printer's leaf and a fine double rule. */
-const ivoryLetterpress = template("ivory-letterpress", "Ivory Letterpress", { color: "#f5efe3", to: "#ebe2d1", angle: 180 }, PAPER, (f) => {
-  const a = area(f);
-  const ink = "#1c1915";
-  const oxblood = "#7b1e28";
-  const soft = "#6f665b";
-  frameBorder(f, f.pad * 0.42, { gap: 7, outer: 2.5, inner: 1 }, ink, 0.9);
-  const kicker: Style = { font: BODONI, size: 22, weight: 600, color: oxblood, uppercase: true, letterSpacing: 420 };
-  const title: Style = { font: BODONI, size: f.by({ square: 56, portrait: 66, story: 66, landscape: 60 }), weight: 600, color: ink, lineHeight: 1.06, enter: "ascend" };
-  const name: Style = { font: BODONI, size: 24, weight: 600, color: ink, uppercase: true, letterSpacing: 220 };
-  const handle: Style = { font: BASKERVILLE, size: 22, color: soft };
-  const words: Style = { font: BASKERVILLE, size: f.by({ square: 50, portrait: 56, story: 64, landscape: 54 }), color: ink, highlight: oxblood, lineHeight: 1.45 };
-  const frame: CameoStyle = { halo: rings([194, 3], [178, 1]), scale: 1.3, haloColor: ink };
-  const time: Style = { font: BODONI, size: 20, weight: 500, color: soft, letterSpacing: 200 };
-
-  if (f.wide) {
-    const left = columnOf(a.left + 60, f.width * 0.47);
-    const right = columnOf(f.width * 0.53, a.right - 60);
-    stack(a.top, a.bottom, [
-      label(f, left, "kicker", "Volume XII", kicker),
-      heading(f, left, title, 3, 22),
-      ornament(f, left.x + left.w / 2, "leaf", hedera(), 96, { color: oxblood }, 26),
-      cameo(f, left.x + left.w / 2, 120, frame, 30),
-      names(f, left, name, handle, 16),
-    ]);
-    upright(f, "seam", f.width * 0.5, a.top + 30, a.bottom - 30, ink, 0.6);
-    stack(a.top, a.bottom, [space(), captions(f, right, words, 5), space(), sound(f, right.x + right.w / 2, 420, 52, { color: ink }, 26), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 40, a.right - 40);
-  stack(a.top, a.bottom, [
-    label(f, c, "kicker", "Volume XII", kicker),
-    heading(f, c, title, 2, 20),
-    ornament(f, a.cx, "leaf", hedera(), f.by({ square: 84, portrait: 96, story: 112, landscape: 0 }), { color: oxblood }, 20),
-    space(), captions(f, c, words, 3, f.by({ square: 16, portrait: 26, story: 40, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 64, landscape: 0 }), { color: ink }, 16),
-    cameo(f, a.cx, f.by({ square: 76, portrait: 104, story: 140, landscape: 0 }), frame, f.by({ square: 20, portrait: 30, story: 50, landscape: 0 })),
-    names(f, c, name, handle, 12),
-    clock(f, c, time, 8),
-  ]);
-});
-
-/** Honed marble and gold leaf: grey veins under a double gilt border, capitals cut in charcoal. */
-const marbleGold = template("marble-gold", "Marble and Gold", { color: "#efece7", to: "#d6d1c9", angle: 160 }, PAPER, (f) => {
-  const a = area(f);
-  const charcoal = "#26231f";
-  const soft = "#6e675f";
-  // Gold leaf's highlights vanish into pale stone, so the small gilt parts take a deeper, flat gold.
-  const deepGold = "#9a7b3c";
-  f.add("graphic", "veins", 0, 0, f.width, f.height, { art: marbleVeins(f.width, f.height, f.by({ square: 11, portrait: 23, story: 37, landscape: 53 })), color: "#8d867d", opacity: 0.32 });
-  frameBorder(f, f.pad * 0.38, { gap: 12, outer: 3, inner: 1.5, jewels: "sides" }, GOLD);
-  const kicker: Style = { font: CINZEL, size: 22, weight: 700, color: "#8a6a2f", uppercase: true, letterSpacing: 400 };
-  const title: Style = { font: CINZEL, size: f.by({ square: 46, portrait: 54, story: 54, landscape: 54 }), weight: 600, color: charcoal, lineHeight: 1.14, letterSpacing: 20, enter: "glide" };
-  const name: Style = { font: CINZEL, size: 26, weight: 700, color: charcoal, letterSpacing: 80 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 66, portrait: 76, story: 84, landscape: 74 }), weight: 700, color: charcoal, highlight: charcoal, lineHeight: 1.28 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 6 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
-
-  if (f.wide) {
-    const left = columnOf(a.left + 60, f.width * 0.38);
-    const right = columnOf(f.width * 0.44, a.right - 60);
-    stack(a.top, a.bottom, [cameo(f, left.x + left.w / 2, 260, frame), names(f, left, name, handle, 28), clock(f, left, time, 14)]);
-    upright(f, "seam", f.width * 0.41, a.top + 40, a.bottom - 40, GOLD);
-    stack(a.top, a.bottom, [
-      label(f, right, "kicker", "Episode XII", kicker),
-      heading(f, right, title, 2, 16),
-      ornament(f, right.x + right.w / 2, "divider", divider(), 400, { color: deepGold }, 16),
-      space(), captions(f, right, words, 3, 16), space(),
-      sound(f, right.x + right.w / 2, 520, 64, { color: deepGold }, 18),
-    ]);
-    return;
-  }
-  const c = columnOf(a.left + 30, a.right - 30);
-  stack(a.top, a.bottom, [
-    label(f, c, "kicker", "Episode XII", kicker, f.by({ square: 10, portrait: 16, story: 0, landscape: 0 })),
-    heading(f, c, title, 2, 14),
-    ornament(f, a.cx, "divider", divider(), f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), { color: deepGold }, 16),
-    cameo(f, a.cx, f.by({ square: 104, portrait: 150, story: 210, landscape: 0 }), frame, f.by({ square: 22, portrait: 34, story: 54, landscape: 0 })),
-    names(f, c, name, handle, 14),
-    space(), captions(f, c, words, 3, f.by({ square: 12, portrait: 22, story: 40, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 58, story: 76, landscape: 0 }), { color: deepGold }, 14),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** A night at the opera: plum velvet and a gilt proscenium arch, "Tonight" in script above the title. */
-const midnightOpera = template("midnight-opera", "Midnight Opera", { color: "#2d0f33", to: "#0c0410", angle: 180 }, DUSK, (f) => {
-  const a = area(f);
-  const ivory = "#f5ead9";
-  const soft = "#bba3c2";
-  const script: Style = { font: VIBES, size: f.by({ square: 64, portrait: 74, story: 86, landscape: 76 }), color: GOLD, lineHeight: 1.25, enter: "fade" };
-  const title: Style = { font: PLAYFAIR, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 48 }), weight: 600, color: ivory, lineHeight: 1.14, uppercase: true, letterSpacing: 80, enter: "glide" };
-  const name: Style = { font: PLAYFAIR, size: 27, weight: 600, color: ivory };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
-  const words: Style = { font: PLAYFAIR, size: f.by({ square: 56, portrait: 64, story: 74, landscape: 62 }), weight: 500, color: ivory, highlight: "#e2c27a", lineHeight: 1.32 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 4, halo: rings([196, 1.5]), scale: 1.24 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 180 };
-  const arch = (x: number, y: number, w: number, h: number) => f.add("graphic", "arch", x, y, w, h, { art: archBorder(Math.round(w), Math.round(h), 14, 2.5), color: GOLD, enter: "curtain" });
-
-  if (f.wide) {
-    const aw = 720;
-    const ax = a.right - aw - 20;
-    arch(ax, a.top - 20, aw, a.bottom - a.top + 20);
-    const left = columnOf(a.left + 40, ax - 70);
-    stack(a.top, a.bottom, [label(f, left, "script", "Tonight", script), heading(f, left, title, 2, 4), ornament(f, left.x + left.w / 2, "rule", taperedRule(), 360, { color: GOLD }, 22), space(), captions(f, left, words, 3, 22), space(), sound(f, left.x + left.w / 2, 520, 64, { color: GOLD }, 18)]);
-    const inside = columnOf(ax + 80, ax + aw - 80);
-    stack(a.top + 200, a.bottom - 60, [cameo(f, ax + aw / 2, 250, frame), names(f, inside, name, handle, 26), clock(f, inside, time, 14)]);
-    return;
-  }
-  const archY = f.by({ square: a.top - 24, portrait: a.top - 20, story: a.top - 60, landscape: 0 });
-  arch(a.left - 20, archY, a.w + 40, a.bottom + 20 - archY);
-  const inside = columnOf(a.left + 40, a.right - 40);
-  stack(archY + (a.w + 40) * f.by({ square: 0.2, portrait: 0.22, story: 0.24, landscape: 0 }), a.bottom - 10, [
-    label(f, inside, "script", "Tonight", script),
-    heading(f, inside, title, 2, 0),
-    cameo(f, a.cx, f.by({ square: 92, portrait: 136, story: 196, landscape: 0 }), frame, f.by({ square: 18, portrait: 30, story: 50, landscape: 0 })),
-    names(f, inside, name, handle, 14),
-    space(), captions(f, inside, words, 3, f.by({ square: 8, portrait: 20, story: 36, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 72, landscape: 0 }), { color: GOLD }, 12),
-    clock(f, inside, time, 8),
-  ]);
-});
-
-/** The wireless age in walnut and bronze: a ribbon microphone under winged capitals, the station's name curved over it. */
-const heritageBroadcast = template("heritage-broadcast", "Heritage Broadcast", { color: "#2f2118", to: "#140d09", angle: 180 }, EMBER, (f) => {
-  const a = area(f);
-  const cream = "#f2e5cd";
-  const soft = "#c9a88d";
-  frameBorder(f, f.pad * 0.36, { gap: 9, outer: 1.5, inner: 1, corner: "step", cut: 22 }, BRONZE, 0.9);
-  const sign: Style = { font: CINZEL, size: f.by({ square: 24, portrait: 26, story: 30, landscape: 26 }), weight: 700, color: BRONZE, uppercase: true, letterSpacing: 300, curve: 26 };
-  const title: Style = { font: CINZEL, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 50 }), weight: 600, color: cream, lineHeight: 1.14, letterSpacing: 30, enter: "glide" };
-  const name: Style = { font: CINZEL, size: 26, weight: 600, color: cream, letterSpacing: 80 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
-  const words: Style = { font: BASKERVILLE, size: f.by({ square: 50, portrait: 56, story: 66, landscape: 54 }), weight: 700, color: cream, highlight: "#e0b872", lineHeight: 1.42 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 180 };
-  const mic = (cx: number, h: number, gap = 0): Block => {
-    const art = ribbonMic();
-    const micW = (h * art.w) / art.h;
-    const wings = decoWings();
-    const wingsW = micW * 3.1;
-    const wingsH = (wingsW * wings.h) / wings.w;
-    return {
-      h: h * f.unit,
-      gap,
-      draw: (y) => {
-        f.add("graphic", "wings", cx - wingsW / 2, y + h * 0.18, wingsW, wingsH, { art: wings, color: BRONZE, opacity: 0.8 });
-        f.add("graphic", "mic", cx - micW / 2, y, micW, h, { art, color: BRONZE, enter: "rise" });
-      },
-    };
-  };
-  const signBlock = (c: Column, gap = 0): Block => {
-    const h = f.lines(sign.size!, 1, 2.4);
-    return { h, gap, draw: (y) => f.add("text", "sign", c.x, y, c.w, h, { text: "On the wireless", align: "center", lineHeight: 1.25, ...sign }) };
-  };
-
-  if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.4);
-    const right = columnOf(f.width * 0.46, a.right - 50);
-    stack(a.top, a.bottom, [signBlock(left), mic(left.x + left.w / 2, 300, 6), cameo(f, left.x + left.w / 2, 110, { rim: BRONZE, rimWidth: 4 }, 34), names(f, left, name, handle, 14)]);
-    upright(f, "seam", f.width * 0.43, a.top + 40, a.bottom - 40, BRONZE, 0.55);
-    stack(a.top, a.bottom, [heading(f, right, title, 2), rule(f, right.x + right.w / 2, "rule", 200, BRONZE, 2, 20), space(), captions(f, right, words, 4, 20), space(), sound(f, right.x + right.w / 2, 500, 64, { color: BRONZE }, 18), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 30, a.right - 30);
-  stack(a.top, a.bottom, [
-    signBlock(c),
-    mic(a.cx, f.by({ square: 150, portrait: 200, story: 270, landscape: 0 }), 4),
-    heading(f, c, title, 2, f.by({ square: 18, portrait: 28, story: 40, landscape: 0 })),
-    rule(f, a.cx, "rule", 160, BRONZE, 2, 14),
-    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 20, story: 34, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 42, portrait: 56, story: 76, landscape: 0 }), { color: BRONZE }, 12),
-    byline(f, a.cx - 190 * f.unit, 380 * f.unit, f.by({ square: 64, portrait: 80, story: 96, landscape: 0 }), name, handle, { rim: BRONZE, rimWidth: 4 }, f.by({ square: 18, portrait: 26, story: 40, landscape: 0 })),
-    clock(f, c, time, 12),
-  ]);
-});
-
-/** Blush stationery sealed in burgundy wax: a rose-gold initial pressed into the seal, the words below in a fine serif. */
-const monogram = template("the-monogram", "The Monogram", { color: "#f6ebe6", to: "#ecdcd5", angle: 180 }, PAPER, (f) => {
-  const a = area(f);
-  const wine = "#4c1826";
-  const soft = "#8a6a6f";
-  frameBorder(f, f.pad * 0.42, { gap: 0, outer: 1.5 }, ROSE, 0.9);
-  const kicker: Style = { font: TENOR, size: 22, color: "#9b5f5a", uppercase: true, letterSpacing: 460 };
-  const title: Style = { font: CORMORANT, size: f.by({ square: 54, portrait: 62, story: 64, landscape: 54 }), weight: 600, color: wine, lineHeight: 1.08, enter: "glide" };
-  const name: Style = { font: TENOR, size: 21, color: wine, uppercase: true, letterSpacing: 300 };
-  const handle: Style = { font: CORMORANT, size: 24, weight: 600, color: soft };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 66, portrait: 76, story: 88, landscape: 74 }), weight: 700, color: wine, highlight: wine, lineHeight: 1.26 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
-  const seal = (cx: number, w: number, gap = 0): Block => {
-    const side = w * f.unit;
-    return {
-      h: side,
-      gap,
-      draw: (y) => {
-        f.add("graphic", "seal", cx - side / 2, y, side, side, { art: waxSeal(), color: "#6d1a2a", enter: "pop" });
-        const size = Math.round(w * 0.44);
-        const h = f.lines(size, 1, 1);
-        f.add("text", "initial", cx - side / 2, y + side / 2 - size * f.unit * 0.42, side, h, { text: "E", font: CINZEL_DECO, size, weight: 700, color: ROSE, align: "center", lineHeight: 1 });
-      },
-    };
-  };
-  // The speaker signs off at the foot: the photo in a fine rose rim, the name beside it, the row centred in `c`.
-  const signature = (c: Column, d: number, gap = 0) => byline(f, c.x + c.w / 2 - 210 * f.unit, 420 * f.unit, d, name, handle, { rim: ROSE, rimWidth: 3 }, gap);
-
-  if (f.wide) {
-    const left = columnOf(a.left + 60, f.width * 0.42);
-    const right = columnOf(f.width * 0.47, a.right - 60);
-    stack(a.top, a.bottom, [seal(left.x + left.w / 2, 240), label(f, left, "kicker", "Private correspondence", kicker, 34), heading(f, left, title, 2, 14), signature(left, 86, 40)]);
-    upright(f, "seam", f.width * 0.445, a.top + 60, a.bottom - 60, ROSE, 0.6);
-    stack(a.top, a.bottom, [space(), captions(f, right, words, 4), space(), sound(f, right.x + right.w / 2, 460, 56, { color: "#9b5f5a" }, 24), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 40, a.right - 40);
-  stack(a.top, a.bottom, [
-    seal(a.cx, f.by({ square: 150, portrait: 190, story: 250, landscape: 0 })),
-    label(f, c, "kicker", "Private correspondence", kicker, f.by({ square: 20, portrait: 28, story: 40, landscape: 0 })),
-    heading(f, c, title, 2, 12),
-    space(), captions(f, c, words, 3, f.by({ square: 14, portrait: 24, story: 40, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 64, landscape: 0 }), { color: "#9b5f5a" }, 14),
-    signature(c, f.by({ square: 70, portrait: 82, story: 98, landscape: 0 }), f.by({ square: 22, portrait: 30, story: 46, landscape: 0 })),
-    clock(f, c, time, 12),
-  ]);
-});
-
-/** The evening paper: a masthead between heavy and fine rules, a dateline, the words set as the lead story. */
-const gazette = template("the-gazette", "The Gazette", { color: "#efe9dc" }, PAPER, (f) => {
-  const a = area(f, 0.8);
-  const ink = "#171512";
-  const red = "#9b1c1c";
-  const soft = "#625b52";
-  const mast: Style = { font: BODONI, size: f.by({ square: 112, portrait: 120, story: 128, landscape: 128 }), weight: 800, color: ink, lineHeight: 1.05, letterSpacing: -10 };
-  const dateline: Style = { font: BODONI, size: 19, weight: 600, color: ink, uppercase: true, letterSpacing: 260 };
-  const kicker: Style = { font: BODONI, size: 22, weight: 700, color: red, uppercase: true, letterSpacing: 300, align: "left" };
-  const title: Style = { font: BODONI, size: f.by({ square: 50, portrait: 58, story: 60, landscape: 58 }), weight: 700, color: ink, lineHeight: 1.08, align: "left", enter: "ascend" };
-  const name: Style = { font: BODONI, size: 20, weight: 700, color: ink, uppercase: true, letterSpacing: 200, align: "left" };
-  const handle: Style = { font: BASKERVILLE, size: 22, color: soft, align: "left" };
-  const words: Style = { font: BASKERVILLE, size: f.by({ square: 54, portrait: 60, story: 68, landscape: 56 }), color: ink, highlight: red, lineHeight: 1.4, align: "left" };
-  const time: Style = { font: BODONI, size: 20, weight: 600, color: soft, uppercase: true, letterSpacing: 200 };
-  // An opening quotation mark in the paper's red, hung over the words as a pull quote's would be.
-  const quote: Style = { font: BODONI, size: f.by({ square: 110, portrait: 130, story: 150, landscape: 130 }), weight: 800, color: red, align: "left", lineHeight: 0.62 };
-  const c = columnOf(a.left, a.right);
-  const head: Block[] = [
-    label(f, c, "masthead", "The Gazette", mast),
-    rule(f, a.cx, "rule-heavy", a.w, ink, 5, 4),
-    pair(f, c, ["edition", "issue"], ["Evening edition", "Episode XII"], dateline, 6),
-    rule(f, a.cx, "rule-fine", a.w, ink, 1.5, 2),
+  const w = f.by({ square: 840, portrait: 860, story: 900, landscape: 0 });
+  const x = (f.width - f.px(w)) / 2;
+  const inset = f.by({ square: 44, portrait: 50, story: 58, landscape: 0 });
+  const inner = column(x + f.px(inset), x + f.px(w) - f.px(inset));
+  const blocks: Blocks = [
+    header(f, inner, title, name, f.by({ square: 64, portrait: 72, story: 80, landscape: 0 }), portrait),
+    ring(f, f.width / 2, f.by({ square: 230, portrait: 350, story: 460, landscape: 0 }), WHITE, percent(f.by({ square: 76, portrait: 110, story: 140, landscape: 0 }))(f.width / 2), f.by({ square: 14, portrait: 30, story: 50, landscape: 0 })),
+    captions(f, inner, words, f.by({ square: 2, portrait: 3, story: 3, landscape: 0 }), f.by({ square: 14, portrait: 28, story: 44, landscape: 0 })),
+    stats(f, inner, SHOW, figures, f.by({ square: 20, portrait: 34, story: 54, landscape: 0 })),
   ];
-  const credit = (col: Column, d: number, gap = 0) => byline(f, col.x, col.w, d, name, handle, { rim: ink, rimWidth: 2 }, gap);
-
-  if (f.wide) {
-    const lead = columnOf(a.left, a.left + a.w * 0.64);
-    const side = columnOf(lead.x + lead.w + 60, a.right);
-    const mastH = head.reduce((sum, block) => sum + block.h + block.gap, 0);
-    stack(a.top, a.top + mastH, head);
-    const top = a.top + mastH + 34;
-    upright(f, "column", lead.x + lead.w + 30, top, a.bottom, ink, 0.7);
-    stack(top, a.bottom, [label(f, lead, "kicker", "The interview", kicker), heading(f, lead, title, 2, 8), space(), label(f, lead, "quote", "“", quote), captions(f, lead, words, 2), space(1.4)]);
-    stack(top, a.bottom, [credit(side, 80), rule(f, side.x + side.w / 2, "rule-side", side.w, ink, 1, 18), sound(f, side.x + side.w / 2, side.w, 80, { color: ink }, 22), clock(f, side, { ...time, align: "left" }, 12), space(), links(f, side, { ...time, align: "left" })]);
-    return;
-  }
-  stack(a.top, a.bottom, [
-    ...head,
-    label(f, c, "kicker", "The interview", kicker, f.by({ square: 26, portrait: 34, story: 50, landscape: 0 })),
-    heading(f, c, title, 2, 8),
-    credit(c, f.by({ square: 60, portrait: 72, story: 86, landscape: 0 }), 18),
-    rule(f, a.cx, "rule-story", a.w, ink, 1, 16),
-    space(),
-    label(f, c, "quote", "“", quote),
-    captions(f, c, words, 2),
-    space(1.4),
-    rule(f, a.cx, "rule-foot", a.w, ink, 1, 10),
-    {
-      h: f.by({ square: 44, portrait: 56, story: 70, landscape: 0 }) * f.unit,
-      gap: 14 * f.unit,
-      draw: (y, h) => {
-        const w = 360 * f.unit;
-        f.add("visual", "main", a.left, y, w, h, { visual: "bars", color: ink });
-        f.add("time", "main", a.right - 300 * f.unit, y, 300 * f.unit, h, { ...time, align: "right" });
-      },
-    },
-  ]);
+  const h = measure(blocks) + f.px(inset) * 2;
+  card(f, "card", x, a.top + (a.h - h) / 2, f.px(w), inset, pane, blocks);
 });
 
-/** Royal purple and gold: three fleurs-de-lis over a decorative title, the speaker in a ring of fine gold. */
-const imperialPurple = template("imperial-purple", "Imperial Purple", { color: "#3d1764", to: "#16072a", angle: 180 }, DUSK, (f) => {
+/** A lone tree in fog, toned a deep cool slate: the words large on the photo itself, and a sheet of dark glass along
+ *  the foot holding the speaker inside a ring of dots, their name and the time. */
+const slateMist = template("slate-mist", "Slate Mist", { color: "#2c3640", to: "#131a21", angle: 180 }, INK, (f) => {
+  // Graded down and hard, so the fog the words sit on is dark enough for the ones still to come and the tree stands
+  // out of it, instead of grey on grey.
+  backdrop(f, "ff81826c", { filter: "slate", adjust: { brightness: 0.42, contrast: 1.6 }, crop: { x: f.by({ square: 0.4, portrait: 0.5, story: 0.6, landscape: 0.2 }), y: 0, zoom: 1 }, loop: "slowZoom" });
+  const pane: Glass = { tint: "#0b1117", strength: 0.36, frost: 28, corner: 44, edge: 1.5 };
+  const title: Style = { font: DM_SANS, size: f.by({ square: 40, portrait: 46, story: 52, landscape: 46 }), weight: 500, color: WHITE, shadow: true };
+  const words: Style = { font: DM_SANS, size: f.by({ square: 56, portrait: 62, story: 70, landscape: 62 }), weight: 600, color: WHITE, highlight: "#e9f1f7", shadow: true, lineHeight: 1.24 };
+  const name: Style = { font: DM_SANS, size: f.by({ square: 32, portrait: 34, story: 38, landscape: 36 }), weight: 600, color: WHITE };
+  const handle: Style = { font: DM_SANS, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 400, color: WHITE, opacity: QUIET };
+  const time: Style = { font: DOTS, size: f.by({ square: 62, portrait: 64, story: 70, landscape: 68 }), weight: 400, color: WHITE, clock: "elapsed" };
+  const portrait: Portrait = { fill: "#d7e2ea", ink: "#22303b" };
   const a = area(f);
-  const ivory = "#f5ecdb";
-  const soft = "#b9a6d6";
-  frameBorder(f, f.pad * 0.36, { gap: 10, outer: 2, inner: 1, jewels: "sides" }, GOLD, 0.9);
-  const title: Style = { font: CINZEL_DECO, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 50 }), weight: 700, color: GOLD, lineHeight: 1.16, enter: "glide", loop: "shimmer" };
-  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: soft, uppercase: true, letterSpacing: 420 };
-  const name: Style = { font: CINZEL, size: 27, weight: 600, color: ivory, letterSpacing: 80 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.28 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: rings([196, 2], [184, 1], [172, 1]), scale: 1.32, loop: "slowZoom" };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
-  const lilies = (cx: number, w: number, gap = 0): Block => {
-    const art = fleurDeLis();
-    const big = w * f.unit;
-    const small = big * 0.62;
-    const h = (big * art.h) / art.w;
-    return {
-      h,
-      gap,
-      draw: (y) => {
-        const smallH = (small * art.h) / art.w;
-        f.add("graphic", "lily-left", cx - big * 1.5 - small / 2, y + h - smallH, small, smallH, { art, color: GOLD });
-        f.add("graphic", "lily", cx - big / 2, y, big, h, { art, color: GOLD, enter: "rise" });
-        f.add("graphic", "lily-right", cx + big * 1.5 - small / 2, y + h - smallH, small, smallH, { art, color: GOLD });
-      },
-    };
+
+  /** The ring of dots with the speaker in it, `d` across, and their name, handle and the time beside it. */
+  const speaker = (c: Column, d: number, gap = 0): Block => {
+    const nameH = f.lines(name.size!, 1, 1.3);
+    const handleH = f.lines(handle.size!, 1, 1.3);
+    const timeH = f.lines(time.size!, 1, 1.2);
+    return row(f, d, gap, (y, h) => {
+      f.add("visual", "main", c.x, y, h, h, { visual: "ring", color: WHITE });
+      avatarAt(f, c.x + h / 2, y + h / 2, d * 0.66, portrait);
+      const x = c.x + h + f.px(36);
+      const w = c.x + c.w - x;
+      const top = y + (h - nameH - handleH - timeH - f.px(10)) / 2;
+      f.add("name", "main", x, top, w, nameH, { align: "left", ...name });
+      f.add("handle", "main", x, top + nameH, w, handleH, { align: "left", ...handle });
+      f.add("time", "main", x, top + nameH + handleH + f.px(10), w, timeH, { align: "left", ...time });
+    });
   };
 
   if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.4);
-    const right = columnOf(f.width * 0.45, a.right - 40);
-    stack(a.top, a.bottom, [lilies(left.x + left.w / 2, 100), cameo(f, left.x + left.w / 2, 240, frame, 40), names(f, left, name, handle, 30)]);
-    upright(f, "seam", f.width * 0.425, a.top + 40, a.bottom - 40, GOLD, 0.5);
-    stack(a.top, a.bottom, [label(f, right, "kicker", "Episode XII", kicker), heading(f, right, title, 2, 16), ornament(f, right.x + right.w / 2, "divider", divider(), 400, { color: GOLD }, 16), space(), captions(f, right, words, 3, 16), space(), sound(f, right.x + right.w / 2, 500, 64, { color: GOLD }, 16), clock(f, right, time, 10)]);
+    const left = column(a.left, f.px(1080));
+    stack(a.top, a.bottom, [heading(f, left, title, 2), space(), captions(f, left, words, 4), space(0.4)]);
+    const x = f.px(1180);
+    const inner = column(x + f.px(48), a.right - f.px(48));
+    const sheet: Blocks = [speaker(inner, 250)];
+    const h = measure(sheet) + f.px(96);
+    card(f, "card", x, a.bottom - h, a.right - x, 48, pane, sheet);
     return;
   }
-  const c = columnOf(a.left + 20, a.right - 20);
-  stack(a.top, a.bottom, [
-    lilies(a.cx, f.by({ square: 80, portrait: 100, story: 120, landscape: 0 })),
-    label(f, c, "kicker", "Episode XII", kicker, 20),
-    heading(f, c, title, 2, 12),
-    cameo(f, a.cx, f.by({ square: 104, portrait: 150, story: 214, landscape: 0 }), frame, f.by({ square: 20, portrait: 32, story: 50, landscape: 0 })),
-    names(f, c, name, handle, 16),
-    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 22, story: 38, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 58, story: 78, landscape: 0 }), { color: GOLD }, 14),
-    clock(f, c, time, 10),
+  const c = column(a.left, a.right);
+  const d = f.by({ square: 200, portrait: 230, story: 260, landscape: 0 });
+  const inset = f.by({ square: 40, portrait: 44, story: 50, landscape: 0 });
+  const sheetH = f.px(d + inset * 2);
+  stack(a.top, a.bottom - sheetH, [heading(f, c, title, 2), space(), captions(f, c, words, f.by({ square: 3, portrait: 4, story: 5, landscape: 0 })), space(0.5)]);
+  card(f, "card", a.left, a.bottom - sheetH, a.w, inset, pane, [speaker(column(a.left + f.px(inset), a.right - f.px(inset)), d)]);
+});
+
+/** A grey sea under a pale horizon, toned in ash: light type on a card in the sky, a long strip of bars, and the
+ *  title set thin over the water. */
+const ashHorizon = template("ash-horizon", "Ash Horizon", { color: "#4a4b4d", to: "#202123", angle: 180 }, INK, (f) => {
+  backdrop(f, "562ff8ce", { filter: "ash", adjust: { brightness: 0.6, contrast: 1.2 }, crop: { x: 0, y: f.by({ square: 0, portrait: 0, story: 0, landscape: 0.3 }), zoom: 1 }, loop: "slowZoom" });
+  // The card sits in the pale sky, so its tint is what keeps the words still to come readable.
+  const pane: Glass = { tint: "#141517", strength: 0.46, frost: 26, corner: 40, edge: 1.5 };
+  const title: Style = { font: OUTFIT, size: f.by({ square: 52, portrait: 60, story: 66, landscape: 64 }), weight: 300, color: WHITE, shadow: true, lineHeight: 1.1 };
+  const name: Style = { font: OUTFIT, size: f.by({ square: 26, portrait: 28, story: 30, landscape: 28 }), weight: 500, color: WHITE };
+  const handle: Style = { font: OUTFIT, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 400, color: WHITE, opacity: QUIET };
+  const words: Style = { font: OUTFIT, size: f.by({ square: 50, portrait: 54, story: 62, landscape: 54 }), weight: 400, color: WHITE, highlight: WHITE, lineHeight: 1.26 };
+  const figures: StatLook = { value: { font: OUTFIT, size: f.by({ square: 34, portrait: 36, story: 42, landscape: 38 }), weight: 400, color: WHITE }, label: { font: OUTFIT, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 400 }, ink: WHITE, dim: QUIET };
+  const portrait: Portrait = { fill: "#e6e6e4", ink: "#2b2c2e", rim: WHITE };
+  const a = area(f);
+
+  const top = (c: Column, d: number): Block => byline(f, c, d, portrait, name, handle);
+
+  if (f.wide) {
+    const x = a.left;
+    const w = f.px(1040);
+    const inner = column(x + f.px(52), x + w - f.px(52));
+    card(f, "card", x, a.top, w, 52, pane, [top(inner, 64), captions(f, inner, words, 4, 40), bars(f, inner.x, inner.w, 64, WHITE, 36), stats(f, inner, SHOW, figures, 40)]);
+    const right = column(f.px(1220), a.right);
+    stack(a.top, a.bottom, [space(), heading(f, right, title, 4)]);
+    return;
+  }
+  const c = column(a.left, a.right);
+  const inner = column(a.left + f.px(48), a.right - f.px(48));
+  const h = card(f, "card", a.left, a.top, a.w, f.by({ square: 44, portrait: 48, story: 54, landscape: 0 }), pane, [
+    top(inner, f.by({ square: 58, portrait: 64, story: 72, landscape: 0 })),
+    captions(f, inner, words, 3, f.by({ square: 26, portrait: 36, story: 50, landscape: 0 })),
+    bars(f, inner.x, inner.w, f.by({ square: 50, portrait: 60, story: 76, landscape: 0 }), WHITE, f.by({ square: 22, portrait: 32, story: 44, landscape: 0 })),
+    stats(f, inner, SHOW, figures, f.by({ square: 26, portrait: 36, story: 50, landscape: 0 })),
+  ]);
+  stack(a.top + h, a.bottom, [space(), heading(f, c, title, f.by({ square: 2, portrait: 3, story: 3, landscape: 0 }))]);
+});
+
+/** A city out of focus at night under dark glass, set out like a phone's widgets: the time in a ring of dots, the
+ *  speaker, and a wide pane for the words. */
+const nightGlass = template("night-glass", "Night Glass", { color: "#141824", to: "#07080d", angle: 180 }, INK, (f) => {
+  backdrop(f, "5d9b67b8", { adjust: { brightness: 0.9, saturation: 1.15 }, crop: { x: f.by({ square: 0, portrait: 0.1, story: 0.1, landscape: 0 }), y: 0, zoom: 1.05 }, loop: "slowZoom" });
+  // Dark enough over the brightest of the lights for the words still to come.
+  const pane: Glass = { tint: "#0b0e18", strength: 0.5, frost: 34, corner: 44, edge: 1.5 };
+  const amber = "#ffc46b";
+  const title: Style = { font: GROTESK, size: f.by({ square: 27, portrait: 28, story: 32, landscape: 30 }), weight: 500, color: WHITE, opacity: 0.82 };
+  const words: Style = { font: GROTESK, size: f.by({ square: 50, portrait: 56, story: 64, landscape: 58 }), weight: 600, color: WHITE, highlight: amber, lineHeight: 1.26 };
+  const name: Style = { font: GROTESK, size: f.by({ square: 30, portrait: 32, story: 36, landscape: 34 }), weight: 600, color: WHITE };
+  const handle: Style = { font: GROTESK, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 400, color: WHITE, opacity: QUIET };
+  const portrait: Portrait = { fill: "#262b3a", ink: WHITE, rim: WHITE };
+  const a = area(f);
+  const gutter = f.px(24);
+  const inset = f.px(f.by({ square: 34, portrait: 38, story: 44, landscape: 40 }));
+
+  /** The time widget: a ring of dots in amber with the time played in dot-matrix figures inside. */
+  const clockWidget = (x: number, y: number, side: number) => {
+    glass(f, "clock", x, y, side, side, pane);
+    const d = side - inset * 2;
+    f.add("visual", "ring", x + inset, y + inset, d, d, { visual: "ring", color: amber });
+    clockAt(f, "main", x + side / 2, y + side / 2, (d * 0.8) / f.unit, { clock: "elapsed", font: DOTS, size: Math.round((d / f.unit) * 0.22), weight: 300, color: WHITE });
+  };
+  /** The speaker widget: their photo at the top left, name and handle along the foot. */
+  const speakerWidget = (x: number, y: number, w: number, h: number) => {
+    glass(f, "speaker", x, y, w, h, pane);
+    const d = Math.min(150, ((h - inset * 2) / f.unit) * 0.48);
+    avatarAt(f, x + inset + f.px(d) / 2, y + inset + f.px(d) / 2, d, portrait);
+    const handleH = f.lines(handle.size!, 1, 1.3);
+    const nameH = f.lines(name.size!, 1, 1.3);
+    f.add("handle", "main", x + inset, y + h - inset - handleH, w - inset * 2, handleH, { align: "left", ...handle });
+    f.add("name", "main", x + inset, y + h - inset - handleH - nameH, w - inset * 2, nameH, { align: "left", ...name });
+    icon(f, "live", "broadcast", x + w - inset - f.px(30), y + inset, 30, amber);
+  };
+
+  if (f.wide) {
+    const side = (a.h - gutter) / 2;
+    clockWidget(a.left, a.top, side);
+    speakerWidget(a.left, a.top + side + gutter, side, side);
+    const x = a.left + side + gutter;
+    glass(f, "card", x, a.top, a.right - x, a.h, pane);
+    const inner = column(x + inset * 1.4, a.right - inset * 1.4);
+    stack(a.top + inset * 1.4, a.bottom - inset * 1.4, [heading(f, inner, title, 2), space(), captions(f, inner, words, 5), space(), bars(f, inner.x, f.px(360), 56, amber)]);
+    return;
+  }
+  const side = (a.w - gutter) / 2;
+  clockWidget(a.left, a.top, side);
+  speakerWidget(a.left + side + gutter, a.top, side, side);
+  const y = a.top + side + gutter;
+  glass(f, "card", a.left, y, a.w, a.bottom - y, pane);
+  const inner = column(a.left + inset * 1.2, a.right - inset * 1.2);
+  stack(y + inset * 1.2, a.bottom - inset * 1.2, [
+    heading(f, inner, title, 2),
+    space(),
+    captions(f, inner, words, f.by({ square: 2, portrait: 4, story: 6, landscape: 0 })),
+    space(),
+    bars(f, inner.x, f.px(300), f.by({ square: 40, portrait: 48, story: 60, landscape: 0 }), amber),
   ]);
 });
 
-/** A champagne toast: a warm gold page, a script greeting, sparkles at the corners and bubbles rising. */
-const champagneToast = template("champagne-toast", "Champagne Toast", { color: "#f4e9d0", to: "#d9c08e", angle: 165 }, PAPER, (f) => {
+/** Light glass on a pale relief of white clay, two discs of colour held behind it so the glass shows them only as soft
+ *  washes that drift. */
+const paleGlass = template("pale-glass", "Pale Glass", { color: "#f1efea", to: "#e3e0d8", angle: 160 }, PAPER, (f) => {
+  backdrop(f, "bff9611c", { adjust: { brightness: 1.06, saturation: 0.2, contrast: 0.9 } });
+  const ink = "#1c1c1f";
   const a = area(f);
-  const brown = "#3a2914";
-  const soft = "#7a6142";
-  const script: Style = { font: VIBES, size: f.by({ square: 60, portrait: 70, story: 82, landscape: 72 }), color: "#8a6420", lineHeight: 1.25, enter: "fade" };
-  const title: Style = { font: ITALIANA, size: f.by({ square: 48, portrait: 48, story: 48, landscape: 60 }), color: brown, uppercase: true, lineHeight: 1.12, letterSpacing: 90, enter: "glide" };
-  const name: Style = { font: TENOR, size: 22, color: brown, uppercase: true, letterSpacing: 300 };
-  // On a page this light, the rule and the sound take a deep flat gold; the polished one would fade into it.
-  const deepGold = "#8a6420";
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
-  const words: Style = { font: GILDA, size: f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), color: brown, highlight: brown, lineHeight: 1.34 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: rings([196, 1.5]), scale: 1.22 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
-  const glint = f.by({ square: 110, portrait: 130, story: 160, landscape: 140 });
-  f.add("graphic", "sparkles", a.right - glint * 0.9, a.top - glint * 0.35, glint, glint, { art: sparkles(), color: GOLD, loop: "pulse", speed: 0.5 });
-  f.add("graphic", "sparkles-low", a.left - glint * 0.1, a.bottom - glint * 0.65, glint * 0.7, glint * 0.7, { art: sparkles(), color: GOLD, flipX: true, loop: "pulse", speed: 0.4 });
-  // A few bubbles drifting up one side, each its own size and pace.
-  [[0.08, 0.62, 18], [0.12, 0.5, 11], [0.06, 0.4, 8], [0.92, 0.7, 14], [0.9, 0.56, 9]].forEach(([x, y, r], index) => {
-    const side = r * 2 * f.unit;
-    f.add("shape", `bubble-${index + 1}`, f.width * x - side / 2, f.height * y, side, side, { shape: "ellipse", fill: "#fffaf0", opacity: 0.55, loop: "float", speed: 0.4 + index * 0.08 });
+  const pane: Glass = { tint: WHITE, strength: 0.5, frost: 48, corner: 48, edge: 2 };
+  const title: Style = { font: DM_SANS, size: f.by({ square: 40, portrait: 46, story: 52, landscape: 48 }), weight: 700, color: ink, lineHeight: 1.12 };
+  const words: Style = { font: DM_SANS, size: f.by({ square: 48, portrait: 54, story: 62, landscape: 56 }), weight: 600, color: ink, highlight: ink, lineHeight: 1.28 };
+  const name: Style = { font: DM_SANS, size: f.by({ square: 26, portrait: 28, story: 31, landscape: 29 }), weight: 600, color: ink };
+  const handle: Style = { font: DM_SANS, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 400, color: ink, opacity: QUIET };
+  const time: Style = { font: DM_SANS, size: f.by({ square: 28, portrait: 29, story: 31, landscape: 29 }), weight: 600, color: ink, opacity: 0.85 };
+  const portrait: Portrait = { fill: "#1c1c1f", ink: "#f1efea" };
+
+  /** The sound and the time on one line. */
+  const foot = (c: Column, h: number, gap: number): Block => row(f, h, gap, (y, height) => {
+    f.add("visual", "main", c.x, y, f.px(260), height, { visual: "bars", color: ink });
+    const timeH = f.lines(time.size!, 1, 1.3);
+    f.add("time", "main", c.x + c.w - f.px(280), y + (height - timeH) / 2, f.px(280), timeH, { ...time, align: "right" });
+  });
+
+  const x = f.wide ? f.px(300) : a.left + f.px(20);
+  const w = f.wide ? f.width - x * 2 : a.w - f.px(40);
+  const inset = f.by({ square: 48, portrait: 54, story: 60, landscape: 64 });
+  const inner = column(x + f.px(inset), x + w - f.px(inset));
+  const blocks: Blocks = [
+    byline(f, inner, f.by({ square: 60, portrait: 64, story: 72, landscape: 64 }), portrait, name, handle),
+    heading(f, inner, title, f.by({ square: 2, portrait: 3, story: 3, landscape: 2 }), f.by({ square: 26, portrait: 36, story: 50, landscape: 30 })),
+    captions(f, inner, words, f.by({ square: 3, portrait: 4, story: 5, landscape: 3 }), f.by({ square: 24, portrait: 36, story: 50, landscape: 30 })),
+    foot(inner, f.by({ square: 40, portrait: 46, story: 54, landscape: 48 }), f.by({ square: 28, portrait: 40, story: 56, landscape: 34 })),
+  ];
+  const h = measure(blocks) + f.px(inset) * 2;
+  const y = f.wide ? (f.height - h) / 2 : a.top + (a.h - h) / 2;
+  // Inside the card's outline, so outside it the page stays clean and inside only their blur shows.
+  const side = Math.min(w, h) * 0.62;
+  const disc = (name: string, cx: number, cy: number, color: string) => f.add("shape", name, cx - side / 2, cy - side / 2, side, side, { shape: "ellipse", fill: color, loop: "float" });
+  disc("disc-warm", x + side / 2 + f.px(24), y + side / 2 + f.px(24), "#f3a47e");
+  disc("disc-cool", x + w - side / 2 - f.px(24), y + h - side / 2 - f.px(24), "#8db2ea");
+  card(f, "card", x, y, w, inset, pane, blocks);
+});
+
+/** A music player's now-playing screen: the words above as lyrics, the speaker as the artwork on a dark glass player
+ *  with the sound as its scrubber, the time either side and the controls under it. */
+const nowPlaying = template("now-playing", "Now Playing", { color: "#3a2a1c", to: "#120d08", angle: 180 }, INK, (f) => {
+  // Headphones on a warm desk, out of focus behind the player; Editorial has the microphone.
+  backdrop(f, "c357fca2", { adjust: { brightness: 0.52, saturation: 1.1, blur: 16 }, crop: { x: 0, y: 0, zoom: 1.1 } });
+  const pane: Glass = { tint: "#120c06", strength: 0.34, frost: 30, corner: 44, edge: 1.5 };
+  const words: Style = { font: INTER, size: f.by({ square: 54, portrait: 62, story: 70, landscape: 64 }), weight: 700, color: WHITE, highlight: WHITE, lineHeight: 1.22 };
+  const title: Style = { font: INTER, size: f.by({ square: 30, portrait: 32, story: 36, landscape: 34 }), weight: 600, color: WHITE };
+  const name: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 500, color: WHITE, opacity: QUIET };
+  const time: Style = { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 500, color: WHITE, opacity: QUIET };
+  const portrait: Portrait = { fill: "#e9d6bd", ink: "#3a2a1c" };
+  const a = area(f);
+
+  /** The scrubber: the sound as a strip of bars, the time played under its left end and the time left under its right. */
+  const scrubber = (c: Column, h: number, gap: number): Block => {
+    const timeH = f.lines(time.size!, 1, 1.3);
+    return row(f, h + 8 + time.size! * 1.3, gap, (y) => {
+      f.add("visual", "main", c.x, y, c.w, f.px(h), { visual: "bars", color: WHITE });
+      f.add("time", "elapsed", c.x, y + f.px(h + 8), f.px(180), timeH, { ...time, align: "left", clock: "elapsed" });
+      f.add("time", "remaining", c.x + c.w - f.px(180), y + f.px(h + 8), f.px(180), timeH, { ...time, align: "right", clock: "remaining" });
+    });
+  };
+  /** Like, pause and share, the pause larger and in the middle. */
+  const controls = (cx: number, size: number, gap: number): Block => row(f, size, gap, (y, h) => {
+    const small = size * 0.62;
+    const apart = f.px(size * 2.2);
+    icon(f, "like", "heart", cx - apart - f.px(small) / 2, y + (h - f.px(small)) / 2, small, WHITE, 0.72);
+    icon(f, "pause", "pause", cx - h / 2, y, size, WHITE);
+    icon(f, "share", "share-network", cx + apart - f.px(small) / 2, y + (h - f.px(small)) / 2, small, WHITE, 0.72);
   });
 
   if (f.wide) {
-    const left = columnOf(a.left + 60, f.width * 0.42);
-    const right = columnOf(f.width * 0.46, a.right - 80);
-    stack(a.top, a.bottom, [label(f, left, "script", "A toast to", script), heading(f, left, title, 2, 0), ornament(f, left.x + left.w / 2, "rule", taperedRule(), 340, { color: deepGold }, 24), cameo(f, left.x + left.w / 2, 150, frame, 30), names(f, left, name, handle, 18)]);
-    stack(a.top, a.bottom, [space(), captions(f, right, words, 4), space(), sound(f, right.x + right.w / 2, 480, 64, { color: deepGold }, 24), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 40, a.right - 40);
-  stack(a.top, a.bottom, [
-    label(f, c, "script", "A toast to", script),
-    heading(f, c, title, 2, 0),
-    ornament(f, a.cx, "rule", taperedRule(), f.by({ square: 300, portrait: 340, story: 400, landscape: 0 }), { color: deepGold }, 16),
-    space(), captions(f, c, words, 3, f.by({ square: 12, portrait: 22, story: 36, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 72, landscape: 0 }), { color: deepGold }, 12),
-    cameo(f, a.cx, f.by({ square: 84, portrait: 116, story: 160, landscape: 0 }), frame, f.by({ square: 20, portrait: 30, story: 46, landscape: 0 })),
-    names(f, c, name, handle, 12),
-    clock(f, c, time, 8),
-  ]);
-});
-
-/** A film still in black and silver: a title card over the speaker in a spotlight, the words between two hairlines
- *  running edge to edge like subtitles on the screen, and the speaker billed underneath. */
-const noirCinema = template("noir-cinema", "Noir Cinema", { color: "#1e1f23", to: "#050506", angle: 180 }, INK, (f) => {
-  const a = area(f);
-  const white = "#f2f2f0";
-  const soft = "#9a9ca3";
-  const kicker: Style = { font: TENOR, size: 22, color: SILVER, uppercase: true, letterSpacing: 520 };
-  const title: Style = { font: BODONI, size: f.by({ square: 50, portrait: 50, story: 50, landscape: 56 }), weight: 700, color: SILVER, uppercase: true, lineHeight: 1.08, letterSpacing: 40, enter: "glide", loop: "shimmer" };
-  const billing: Style = { font: TENOR, size: 19, color: soft, uppercase: true, letterSpacing: 520 };
-  const name: Style = { font: BODONI, size: 30, weight: 600, color: white, uppercase: true, letterSpacing: 240 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 180 };
-  const words: Style = { font: INSTRUMENT, size: f.by({ square: 72, portrait: 80, story: 88, landscape: 80 }), color: white, highlight: "#dfe3e8", lineHeight: 1.22 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 220 };
-  const spotlight = (cx: number, cy: number, d: number) => {
-    const rays = d * 2.4 * f.unit;
-    f.add("graphic", "rays", cx - rays / 2, cy - rays / 2, rays, rays, { art: sunburst(), color: SILVER, opacity: 0.24 });
-    cameoAt(f, cx, cy, d, { rim: SILVER, rimWidth: 4 });
-  };
-  const burst = (cx: number, d: number, gap = 0): Block => {
-    const h = d * 1.5 * f.unit;
-    return { h, gap: gap * f.unit, draw: (y) => spotlight(cx, y + h / 2, d) };
-  };
-  // The screen: two silver hairlines across the whole frame and the words between them.
-  const screen = (c: Column, count: number, inset: number, gap = 0): Block => {
-    const lines = captions(f, c, words, count);
-    const pad = inset * f.unit;
-    const h = lines.h + pad * 2;
-    const edge = (name: string, y: number) => f.add("shape", name, 0, y - 4 * f.unit, f.width, 8 * f.unit, { shape: "line", fill: SILVER, strokeWidth: 1.5, opacity: 0.75, enter: "unfold" });
-    return {
-      h,
-      gap: gap * f.unit,
-      draw: (y) => {
-        edge("screen-top", y);
-        edge("screen-foot", y + h);
-        lines.draw(y + pad, lines.h);
-      },
-    };
-  };
-
-  if (f.wide) {
-    const c = columnOf(a.left, a.right);
-    const rowH = 150 * f.unit;
-    stack(a.top, a.bottom, [
-      label(f, c, "kicker", "The late show", kicker),
-      heading(f, c, title, 1, 12),
+    const w = f.px(620);
+    const inner = column(a.left + f.px(52), a.left + w - f.px(52));
+    const art = 300;
+    glass(f, "card", a.left, a.top, w, a.h, pane);
+    stack(a.top + f.px(52), a.bottom - f.px(52), [
+      row(f, art, 0, (y, h) => avatarAt(f, a.left + w / 2, y + h / 2, art, portrait)),
       space(),
-      screen(columnOf(a.left + 80, a.right - 80), 2, 44),
-      space(),
-      {
-        h: rowH,
-        gap: 0,
-        draw: (y) => {
-          spotlight(a.left + 120 * f.unit, y + rowH / 2, 104);
-          const x = a.left + 230 * f.unit;
-          const billH = f.lines(19, 1, 1.4);
-          const nameH = f.lines(30, 1, 1.35);
-          const handleH = f.lines(22, 1, 1.3);
-          const top = y + (rowH - billH - nameH - handleH) / 2;
-          f.add("text", "billing", x, top, 520 * f.unit, billH, { text: "Starring", align: "left", lineHeight: 1.4, ...billing });
-          f.add("name", "main", x, top + billH, 640 * f.unit, nameH, { ...name, align: "left" });
-          f.add("handle", "main", x, top + billH + nameH, 640 * f.unit, handleH, { ...handle, align: "left" });
-          const barsW = 420 * f.unit;
-          f.add("visual", "main", a.right - barsW, y + rowH / 2 - 40 * f.unit, barsW, 56 * f.unit, { visual: "bars", color: SILVER });
-          f.add("time", "main", a.right - barsW, y + rowH / 2 + 26 * f.unit, barsW, f.lines(20, 1, 1.4), { ...time, align: "right" });
-        },
-      },
+      row(f, name.size! * 1.3, 0, (y, h) => f.add("name", "main", inner.x, y, inner.w, h, { align: "left", ...name })),
+      heading(f, inner, title, 3, 4),
+      scrubber(inner, 52, 30),
+      controls(a.left + w / 2, 58, 30),
     ]);
+    const right = column(a.left + w + f.px(90), a.right);
+    stack(a.top, a.bottom, [space(), captions(f, right, words, 5), space()]);
     return;
   }
-  const c = columnOf(a.left + 30, a.right - 30);
-  stack(a.top, a.bottom, [
-    label(f, c, "kicker", "The late show", kicker),
-    burst(a.cx, f.by({ square: 86, portrait: 120, story: 170, landscape: 0 }), f.by({ square: 6, portrait: 14, story: 30, landscape: 0 })),
-    heading(f, c, title, 2, f.by({ square: 4, portrait: 10, story: 24, landscape: 0 })),
-    space(),
-    screen(c, 2, f.by({ square: 26, portrait: 36, story: 50, landscape: 0 })),
-    space(),
-    label(f, c, "billing", "Starring", billing),
-    names(f, c, name, handle, 2),
-    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 72, landscape: 0 }), { color: SILVER }, f.by({ square: 16, portrait: 26, story: 40, landscape: 0 })),
-    clock(f, c, time, 8),
-  ]);
+  const c = column(a.left, a.right);
+  const inset = f.by({ square: 40, portrait: 44, story: 50, landscape: 0 });
+  const inner = column(a.left + f.px(inset), a.right - f.px(inset));
+  const art = f.by({ square: 96, portrait: 112, story: 128, landscape: 0 });
+  // The artist over room for two lines of the title, so a short title leaves its spare line below, as header() does.
+  const nameH = f.lines(name.size!, 1, 1.3);
+  const titleH = titleRoom(f, title.size!, 1.2);
+  const player: Blocks = [
+    row(f, Math.max(art, (nameH + titleH) / f.unit + 4), 0, (y, h) => {
+      avatarAt(f, inner.x + f.px(art) / 2, y + h / 2, art, portrait);
+      const x = inner.x + f.px(art) + f.px(26);
+      const top = y + (h - nameH - titleH - f.px(4)) / 2;
+      f.add("name", "main", x, top, inner.x + inner.w - x, nameH, { align: "left", ...name });
+      f.add("title", "main", x, top + nameH + f.px(4), inner.x + inner.w - x, titleH, { align: "left", ...title, lineHeight: 1.2 });
+    }),
+    scrubber(inner, f.by({ square: 40, portrait: 48, story: 56, landscape: 0 }), f.by({ square: 26, portrait: 34, story: 44, landscape: 0 })),
+    controls(f.width / 2, f.by({ square: 48, portrait: 54, story: 62, landscape: 0 }), f.by({ square: 18, portrait: 26, story: 36, landscape: 0 })),
+  ];
+  const h = measure(player) + f.px(inset) * 2;
+  stack(a.top, a.bottom - h, [space(), captions(f, c, words, f.by({ square: 3, portrait: 5, story: 6, landscape: 0 })), space(0.6)]);
+  card(f, "card", a.left, a.bottom - h, a.w, inset, pane, player);
 });
 
-/** A prize lecture on parchment: the speaker crowned in a gold laurel wreath, navy ink, an engraved rule. */
-const laureate = template("laureate", "Laureate", { color: "#f4eddd", to: "#e7dcc4", angle: 180 }, PAPER, (f) => {
+/** The time as the hero: a large dot-matrix clock in warm amber on near-black, the words under it. */
+const dotClock = template("dot-clock", "Dot Clock", { color: "#121212", to: "#0a0a0a", angle: 180 }, INK, (f) => {
+  const amber = "#ffb547";
+  // Handjet is narrow, so it is set about as large as a saved design keeps a size (400); light, so it reads as dots.
+  const hero: Style = { font: DOTS, size: f.by({ square: 360, portrait: 400, story: 400, landscape: 400 }), weight: 220, color: amber, clock: "elapsed", enter: "flicker", lineHeight: 1 };
+  const words: Style = { font: GROTESK, size: f.by({ square: 50, portrait: 56, story: 64, landscape: 58 }), weight: 600, color: "#f5f1ea", highlight: amber, lineHeight: 1.26 };
+  const title: Style = { font: GROTESK, size: f.by({ square: 27, portrait: 28, story: 31, landscape: 30 }), weight: 500, color: "#f5f1ea", opacity: QUIET };
+  const name: Style = { font: GROTESK, size: f.by({ square: 27, portrait: 28, story: 31, landscape: 30 }), weight: 600, color: "#f5f1ea" };
+  const handle: Style = { font: GROTESK, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 400, color: "#f5f1ea", opacity: QUIET };
+  const left: Style = { font: DOTS, size: f.by({ square: 54, portrait: 56, story: 62, landscape: 60 }), weight: 400, color: amber, opacity: QUIET, clock: "remaining" };
+  const portrait: Portrait = { fill: amber, ink: "#1a1205" };
   const a = area(f);
-  const navy = "#14213d";
-  const soft = "#5d6478";
-  const deepGold = "#9a7b3c";
-  frameBorder(f, f.pad * 0.4, { gap: 8, outer: 1.5, inner: 1, corner: "round", cut: 26 }, navy, 0.75);
-  const kicker: Style = { font: CINZEL, size: 22, weight: 700, color: "#8a6a2f", uppercase: true, letterSpacing: 380 };
-  const title: Style = { font: CORMORANT, size: f.by({ square: 56, portrait: 64, story: 66, landscape: 62 }), weight: 600, color: navy, lineHeight: 1.06, enter: "glide" };
-  const name: Style = { font: CINZEL, size: 26, weight: 700, color: navy, letterSpacing: 100 };
-  const handle: Style = { font: CORMORANT, size: 24, weight: 600, color: soft };
-  const words: Style = { font: BASKERVILLE, size: f.by({ square: 48, portrait: 54, story: 64, landscape: 52 }), color: navy, highlight: navy, lineHeight: 1.45 };
-  const frame: CameoStyle = { halo: laurelWreath(), scale: 1.6, haloColor: GOLD, rim: GOLD, rimWidth: 3, loop: "slowZoom" };
-  const time: Style = { font: CINZEL, size: 20, weight: 600, color: soft, letterSpacing: 260 };
 
-  if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.42);
-    const right = columnOf(f.width * 0.47, a.right - 60);
-    stack(a.top, a.bottom, [cameo(f, left.x + left.w / 2, 270, frame), names(f, left, name, handle, 20)]);
-    stack(a.top, a.bottom, [label(f, right, "kicker", "The laureate lecture", kicker), heading(f, right, title, 2, 14), ornament(f, right.x + right.w / 2, "rule", taperedRule(), 380, { color: deepGold }, 18), space(), captions(f, right, words, 4, 18), space(), sound(f, right.x + right.w / 2, 460, 56, { color: navy }, 18), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 40, a.right - 40);
-  stack(a.top, a.bottom, [
-    label(f, c, "kicker", "The laureate lecture", kicker),
-    heading(f, c, title, 2, 14),
-    cameo(f, a.cx, f.by({ square: 128, portrait: 196, story: 260, landscape: 0 }), frame, f.by({ square: 12, portrait: 24, story: 44, landscape: 0 })),
-    names(f, c, name, handle, 8),
-    ornament(f, a.cx, "rule", taperedRule(), f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), { color: deepGold }, 16),
-    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 18, story: 32, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 64, landscape: 0 }), { color: navy }, 12),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** A reading room in green morocco: gilt bands as on a book's spine, a chapter opening with its numeral in gold, the
- *  words set as the page, and the speaker named at its foot as on a bookplate. */
-const library = template("the-library", "The Library", { color: "#203528", to: "#0e1b14", angle: 180 }, MINT, (f) => {
-  const a = area(f);
-  const cream = "#f1e7cf";
-  const soft = "#a7c0ad";
-  const band = (name: string, y: number) => f.add("graphic", name, 0, y, f.width, 64 * f.unit, { art: spineBand(f.width), color: GOLD, opacity: 0.95 });
-  const numeral: Style = { font: CINZEL, size: f.by({ square: 76, portrait: 96, story: 110, landscape: 104 }), weight: 500, color: GOLD, lineHeight: 1.05, enter: "fade" };
-  const kicker: Style = { font: TENOR, size: 22, color: GOLD, uppercase: true, letterSpacing: 400 };
-  const title: Style = { font: CORMORANT, size: f.by({ square: 56, portrait: 64, story: 66, landscape: 60 }), weight: 700, color: cream, lineHeight: 1.06, enter: "glide" };
-  const name: Style = { font: CORMORANT, size: 32, weight: 700, color: cream };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
-  const words: Style = { font: BASKERVILLE, size: f.by({ square: 48, portrait: 54, story: 62, landscape: 52 }), color: cream, highlight: "#d9b45a", lineHeight: 1.45 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 4 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
-  const topBand = f.tall ? f.height * 0.08 : f.pad * 0.55;
-  const footBand = f.tall ? f.height * 0.87 : f.height - f.pad * 0.55 - 64 * f.unit;
-  band("band-top", topBand);
-  band("band-foot", footBand);
-  const top = topBand + 64 * f.unit + f.by({ square: 30, portrait: 44, story: 60, landscape: 40 });
-  const bottom = footBand - f.by({ square: 26, portrait: 40, story: 60, landscape: 34 });
-  // The foot of the page: the bookplate on the left, the time on the right like a folio.
-  const foot = (c: Column, d: number, gap = 0): Block => {
-    const plate = byline(f, c.x, c.w * 0.6, d, name, handle, frame);
-    const timeH = f.lines(20, 1, 1.4);
-    return {
-      h: plate.h,
-      gap: gap * f.unit,
-      draw: (y) => {
-        plate.draw(y, plate.h);
-        f.add("time", "main", c.x + c.w * 0.6, y + plate.h / 2 - timeH / 2, c.w * 0.4, timeH, { ...time, align: "right" });
-      },
-    };
+  /** The big clock, the time left small under its start: Handjet is narrow, so the hero fills only part of the column
+   *  and a right-aligned time left would stand alone at the far edge. */
+  const clockBlock = (c: Column, gap = 0): Block => {
+    const heroH = f.lines(hero.size!, 1, 1);
+    const leftH = f.lines(left.size!, 1, 1.2);
+    return { h: heroH + leftH, gap: f.px(gap), draw: (y) => {
+      f.add("time", "main", c.x, y, c.w, heroH, { align: "left", ...hero });
+      f.add("time", "left", c.x, y + heroH, c.w, leftH, { align: "left", ...left });
+    } };
   };
 
   if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.4);
-    const right = columnOf(f.width * 0.47, a.right - 40);
-    stack(top, bottom, [label(f, left, "numeral", "XII", numeral), label(f, left, "kicker", "From the reading room", kicker, 10), heading(f, left, title, 2, 18), rule(f, left.x + left.w / 2, "rule", 90, GOLD, 2, 18)]);
-    upright(f, "seam", f.width * 0.435, top, bottom, GOLD, 0.45);
-    stack(top, bottom, [space(), captions(f, right, words, 4), space(), sound(f, right.x + right.w / 2, 460, 56, { color: GOLD }, 20), foot(right, 92, 26)]);
+    const clockSide = column(a.left, f.px(1060));
+    stack(a.top, a.bottom, [heading(f, clockSide, title, 2), space(), clockBlock(clockSide), space(), bars(f, clockSide.x, f.px(420), 60, amber)]);
+    const right = column(f.px(1160), a.right);
+    stack(a.top, a.bottom, [space(), captions(f, right, words, 5), space(), byline(f, right, 68, portrait, name, handle)]);
     return;
   }
-  const c = columnOf(a.left + 20, a.right - 20);
-  stack(top, bottom, [
-    label(f, c, "numeral", "XII", numeral),
-    label(f, c, "kicker", "From the reading room", kicker, 6),
-    heading(f, c, title, 2, 14),
-    rule(f, a.cx, "rule", 90, GOLD, 2, 8),
-    space(), captions(f, c, words, 3), space(),
-    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 66, landscape: 0 }), { color: GOLD }),
-    foot(c, f.by({ square: 76, portrait: 88, story: 104, landscape: 0 }), f.by({ square: 18, portrait: 28, story: 44, landscape: 0 })),
-  ]);
-});
-
-/** A sapphire gala night: silver wings over a fine title, the speaker in a ring of beads, a scatter of light. */
-const sapphireGala = template("sapphire-gala", "Sapphire Gala", { color: "#163b93", to: "#06143d", angle: 165 }, DUSK, (f) => {
-  const a = area(f);
-  const white = "#f4f6fb";
-  const soft = "#a9b8de";
-  const kicker: Style = { font: TENOR, size: 22, color: SILVER, uppercase: true, letterSpacing: 520 };
-  const title: Style = { font: ITALIANA, size: f.by({ square: 52, portrait: 52, story: 52, landscape: 54 }), color: SILVER, uppercase: true, lineHeight: 1.1, letterSpacing: 80, enter: "glide", loop: "shimmer" };
-  const name: Style = { font: ITALIANA, size: 30, color: white, uppercase: true, letterSpacing: 200 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
-  const words: Style = { font: PLAYFAIR, size: f.by({ square: 56, portrait: 64, story: 74, landscape: 62 }), weight: 500, color: white, highlight: "#dbe4f5", lineHeight: 1.32 };
-  const frame: CameoStyle = { rim: SILVER, rimWidth: 4, halo: beadRing(), scale: 1.32 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
-  const glint = f.by({ square: 70, portrait: 84, story: 100, landscape: 90 });
-  f.add("graphic", "sparkle-a", a.left, a.top + glint * 0.2, glint, glint, { art: sparkles(), color: SILVER, opacity: 0.8, loop: "pulse", speed: 0.5 });
-  f.add("graphic", "sparkle-b", a.right - glint * 0.8, a.bottom - glint * 1.1, glint * 0.8, glint * 0.8, { art: sparkles(), color: SILVER, opacity: 0.7, flipX: true, loop: "pulse", speed: 0.4 });
-
-  if (f.wide) {
-    const left = columnOf(a.left + 80, f.width * 0.42);
-    const right = columnOf(f.width * 0.47, a.right - 60);
-    stack(a.top, a.bottom, [cameo(f, left.x + left.w / 2, 240, frame), names(f, left, name, handle, 30)]);
-    stack(a.top, a.bottom, [ornament(f, right.x + right.w / 2, "wings", decoWings(), 380, { color: SILVER }), label(f, right, "kicker", "Gala evening", kicker, 20), heading(f, right, title, 2, 12), space(), captions(f, right, words, 3, 22), space(), sound(f, right.x + right.w / 2, 500, 60, { color: SILVER }, 18), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 30, a.right - 30);
+  const c = column(a.left, a.right);
   stack(a.top, a.bottom, [
-    ornament(f, a.cx, "wings", decoWings(), f.by({ square: 300, portrait: 360, story: 440, landscape: 0 }), { color: SILVER, enter: "unfold" }),
-    label(f, c, "kicker", "Gala evening", kicker, 18),
-    heading(f, c, title, 2, 12),
-    cameo(f, a.cx, f.by({ square: 100, portrait: 146, story: 210, landscape: 0 }), frame, f.by({ square: 20, portrait: 32, story: 50, landscape: 0 })),
-    names(f, c, name, handle, 14),
-    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 22, story: 38, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 42, portrait: 56, story: 76, landscape: 0 }), { color: SILVER }, 14),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** Peacock teal and gold: the speaker held in an oval cartouche like a locket, the words beneath. */
-const cartoucheFrame = template("cartouche", "Cartouche", { color: "#0f444c", to: "#052127", angle: 180 }, MINT, (f) => {
-  const a = area(f);
-  const ivory = "#f3ead6";
-  const soft = "#9cc7c4";
-  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: GOLD, uppercase: true, letterSpacing: 420 };
-  const title: Style = { font: CINZEL, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 50 }), weight: 600, color: ivory, lineHeight: 1.14, letterSpacing: 30, enter: "glide" };
-  const name: Style = { font: CINZEL, size: 26, weight: 600, color: ivory, letterSpacing: 80 };
-  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.28 };
-  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
-  // The oval's inner ring runs 240 by 340 of its 300 by 400, so the round photo sits in it with sky above and below.
-  const locket = (cx: number, w: number, gap = 0): Block => {
-    const art = cartouche();
-    const width = w * f.unit;
-    const h = (width * art.h) / art.w;
-    return {
-      h,
-      gap: gap * f.unit,
-      draw: (y) => {
-        f.add("graphic", "cartouche", cx - width / 2, y, width, h, { art, color: GOLD, enter: "iris" });
-        const d = w * 0.66;
-        const rim = 4 * f.unit;
-        f.add("shape", "rim", cx - (d * f.unit) / 2 - rim, y + h / 2 - (d * f.unit) / 2 - rim, d * f.unit + rim * 2, d * f.unit + rim * 2, { shape: "ellipse", fill: GOLD });
-        f.add("avatar", "main", cx - (d * f.unit) / 2, y + h / 2 - (d * f.unit) / 2, d * f.unit, d * f.unit);
-      },
-    };
-  };
-
-  if (f.wide) {
-    const left = columnOf(a.left + 40, f.width * 0.4);
-    const right = columnOf(f.width * 0.45, a.right - 60);
-    stack(a.top, a.bottom, [locket(left.x + left.w / 2, 330), names(f, left, name, handle, 24)]);
-    upright(f, "seam", f.width * 0.425, a.top + 40, a.bottom - 40, GOLD, 0.5);
-    stack(a.top, a.bottom, [label(f, right, "kicker", "Episode XII", kicker), heading(f, right, title, 2, 16), ornament(f, right.x + right.w / 2, "scroll", scrollDivider(), 380, { color: GOLD }, 16), space(), captions(f, right, words, 3, 16), space(), sound(f, right.x + right.w / 2, 500, 60, { color: GOLD }, 16), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 20, a.right - 20);
-  stack(a.top, a.bottom, [
-    label(f, c, "kicker", "Episode XII", kicker),
-    heading(f, c, title, 2, 12),
-    locket(a.cx, f.by({ square: 176, portrait: 250, story: 330, landscape: 0 }), f.by({ square: 18, portrait: 30, story: 50, landscape: 0 })),
-    names(f, c, name, handle, 14),
-    space(), captions(f, c, words, 3, f.by({ square: 8, portrait: 20, story: 36, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 42, portrait: 56, story: 76, landscape: 0 }), { color: GOLD }, 14),
-    clock(f, c, time, 10),
-  ]);
-});
-
-/** A gilded salon in white and gold: scrolled corners, a decorative title in warm umber, a scroll beneath it. */
-const baroque = template("baroque", "Baroque", { color: "#f9f5ec", to: "#ece2cf", angle: 180 }, PAPER, (f) => {
-  const a = area(f);
-  const umber = "#3b2a1a";
-  const soft = "#7d6a55";
-  const deepGold = "#8a6a2f";
-  const edge = f.pad * 0.3;
-  corners(f, flourishCorner(), edge, edge, f.width - edge * 2, f.height - edge * 2, f.by({ square: 200, portrait: 220, story: 250, landscape: 220 }), { color: GOLD });
-  const kicker: Style = { font: CINZEL, size: 22, weight: 700, color: "#8a6a2f", uppercase: true, letterSpacing: 420 };
-  const title: Style = { font: CINZEL_DECO, size: f.by({ square: 44, portrait: 52, story: 52, landscape: 52 }), weight: 700, color: umber, lineHeight: 1.16, enter: "glide" };
-  const name: Style = { font: CINZEL, size: 26, weight: 700, color: umber, letterSpacing: 80 };
-  const handle: Style = { font: CORMORANT, size: 24, weight: 600, color: soft };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: umber, highlight: deepGold, lineHeight: 1.28 };
-  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: rings([196, 2], [184, 1]), scale: 1.28, loop: "slowZoom" };
-  const time: Style = { font: CINZEL, size: 20, weight: 700, color: soft, letterSpacing: 260 };
-
-  if (f.wide) {
-    const left = columnOf(a.left + 80, f.width * 0.42);
-    const right = columnOf(f.width * 0.47, a.right - 100);
-    stack(a.top + 20, a.bottom - 20, [cameo(f, left.x + left.w / 2, 250, frame), names(f, left, name, handle, 26)]);
-    stack(a.top + 20, a.bottom - 20, [label(f, right, "kicker", "Episode XII", kicker), heading(f, right, title, 2, 14), ornament(f, right.x + right.w / 2, "scroll", scrollDivider(), 420, { color: GOLD }, 14), space(), captions(f, right, words, 3, 16), space(), sound(f, right.x + right.w / 2, 480, 56, { color: deepGold }, 16), clock(f, right, time, 10)]);
-    return;
-  }
-  const c = columnOf(a.left + 40, a.right - 40);
-  stack(a.top + f.by({ square: 30, portrait: 40, story: 0, landscape: 0 }), a.bottom - f.by({ square: 20, portrait: 30, story: 0, landscape: 0 }), [
-    label(f, c, "kicker", "Episode XII", kicker),
-    heading(f, c, title, 2, 12),
-    ornament(f, a.cx, "scroll", scrollDivider(), f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), { color: GOLD }, 12),
-    cameo(f, a.cx, f.by({ square: 96, portrait: 140, story: 200, landscape: 0 }), frame, f.by({ square: 18, portrait: 30, story: 48, landscape: 0 })),
-    names(f, c, name, handle, 14),
-    space(), captions(f, c, words, 3, f.by({ square: 6, portrait: 18, story: 34, landscape: 0 })), space(),
-    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 38, portrait: 52, story: 70, landscape: 0 }), { color: deepGold }, 12),
-    clock(f, c, time, 8),
-  ]);
-});
-
-/** Nothing to prove: stone and espresso, a fine serif, wide-set capitals and a single hairline. */
-const quietLuxury = template("quiet-luxury", "Quiet Luxury", { color: "#e6e0d6" }, PAPER, (f) => {
-  const a = area(f, 1.15);
-  const espresso = "#2b2520";
-  const taupe = "#7b7064";
-  const small: Style = { font: TENOR, size: 20, color: taupe, uppercase: true, letterSpacing: 420 };
-  const title: Style = { font: CORMORANT, size: f.by({ square: 72, portrait: 80, story: 80, landscape: 76 }), weight: 500, color: espresso, lineHeight: 1.04, align: "left", enter: "glide" };
-  const name: Style = { font: TENOR, size: 18, color: espresso, uppercase: true, letterSpacing: 320, align: "left" };
-  const handle: Style = { font: CORMORANT, size: 24, weight: 500, color: taupe, align: "left" };
-  const words: Style = { font: CORMORANT, size: f.by({ square: 66, portrait: 76, story: 88, landscape: 74 }), weight: 600, color: espresso, highlight: espresso, lineHeight: 1.26, align: "left" };
-  const time: Style = { font: TENOR, size: 20, color: taupe, letterSpacing: 300 };
-  const c = columnOf(a.left, a.right);
-  // A plain photo, no rim: nothing here needs to announce itself.
-  const signature = (col: Column, d: number, gap = 0) => byline(f, col.x, col.w * 0.7, d, name, handle, {}, gap);
-
-  if (f.wide) {
-    const left = columnOf(a.left, f.width * 0.47);
-    const right = columnOf(f.width * 0.53, a.right);
-    stack(a.top, a.bottom, [pair(f, columnOf(a.left, a.right), ["series", "number"], ["In conversation", "No. 12"], small), space(), heading(f, left, title, 3), space(), signature(left, 76)]);
-    stack(a.top + 90, a.bottom, [space(), captions(f, right, words, 4, 0, 0), space(), rule(f, right.x + right.w / 2, "rule", right.w / f.unit, taupe, 1, 10), {
-      h: 48 * f.unit,
-      gap: 18 * f.unit,
-      draw: (y, h) => {
-        f.add("visual", "main", right.x, y, 260 * f.unit, h, { visual: "bars", color: taupe });
-        f.add("time", "main", right.x + right.w - 260 * f.unit, y, 260 * f.unit, h, { ...time, align: "right" });
-      },
-    }]);
-    return;
-  }
-  stack(a.top, a.bottom, [
-    pair(f, c, ["series", "number"], ["In conversation", "No. 12"], small),
-    space(f.by({ square: 0.4, portrait: 0.6, story: 0.8, landscape: 0 })),
-    heading(f, c, title, 2),
-    rule(f, a.left + 60 * f.unit, "rule", 120, taupe, 1, 26),
+    byline(f, c, f.by({ square: 60, portrait: 64, story: 72, landscape: 0 }), portrait, name, handle),
+    space(0.7),
+    clockBlock(c),
+    bars(f, c.x, f.px(320), f.by({ square: 44, portrait: 50, story: 60, landscape: 0 }), amber, f.by({ square: 10, portrait: 16, story: 24, landscape: 0 })),
     space(0.5),
-    captions(f, c, words, 3, 0, 0),
-    space(1),
-    {
-      h: 44 * f.unit,
-      gap: 0,
-      draw: (y, h) => {
-        f.add("visual", "main", a.left, y, 240 * f.unit, h, { visual: "bars", color: taupe });
-        f.add("time", "main", a.right - 260 * f.unit, y, 260 * f.unit, h, { ...time, align: "right" });
-      },
-    },
-    rule(f, a.cx, "rule-foot", a.w / f.unit, taupe, 1, 22),
-    signature(c, f.by({ square: 68, portrait: 76, story: 88, landscape: 0 }), 22),
+    captions(f, c, words, f.by({ square: 3, portrait: 4, story: 5, landscape: 0 })),
+    space(0.7),
+    heading(f, c, title, 2),
   ]);
+});
+
+/** A page of words: the captions set very large on warm paper, marked as they are said in highlighter yellow, and one
+ *  hairline above the speaker. */
+const bigType = template("big-type", "Big Type", { color: "#f2f0eb" }, PAPER, (f) => {
+  const ink = "#151515";
+  const words: Style = { font: BRICOLAGE, size: f.by({ square: 74, portrait: 84, story: 92, landscape: 88 }), weight: 700, color: ink, highlight: "#ffd84d", lineHeight: 1.12, letterSpacing: -20 };
+  const title: Style = { font: BRICOLAGE, size: f.by({ square: 28, portrait: 30, story: 33, landscape: 32 }), weight: 600, color: ink };
+  const episode: Style = { font: BRICOLAGE, size: f.by({ square: 28, portrait: 30, story: 33, landscape: 32 }), weight: 500, color: ink, opacity: QUIET, align: "right" };
+  const name: Style = { font: BRICOLAGE, size: f.by({ square: 27, portrait: 28, story: 31, landscape: 30 }), weight: 600, color: ink };
+  const handle: Style = { font: BRICOLAGE, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 400, color: ink, opacity: QUIET };
+  const portrait: Portrait = { fill: ink, ink: "#f2f0eb" };
+  const a = area(f);
+
+  /** Room for two lines of the title on the left of the top line, the episode on the right of its first. */
+  const top = (c: Column): Block => {
+    const h = titleRoom(f, title.size!, 1.25);
+    return { h, gap: 0, draw: (y) => {
+      f.add("title", "main", c.x, y, c.w * 0.72, h, { align: "left", ...title, lineHeight: 1.25 });
+      f.add("text", "episode", c.x + c.w * 0.72, y, c.w * 0.28, f.lines(episode.size!, 1, 1.25), { text: "Ep. 00", lineHeight: 1.25, ...episode });
+    } };
+  };
+  /** The speaker on the left of the foot, the sound on the right. */
+  const foot = (c: Column, d: number): Block => byline(f, c, d, portrait, name, handle, 0, (y, h) => {
+    f.add("visual", "main", c.x + c.w - f.px(220), y + (h - f.px(44)) / 2, f.px(220), f.px(44), { visual: "bars", color: ink });
+  });
+
+  const c = column(a.left, a.right);
+  if (f.wide) {
+    stack(a.top, a.bottom, [top(c), space(), captions(f, column(a.left, f.px(1500)), words, 5), space(), rule(f, c, "rule", ink, 1), foot(c, 64)]);
+    return;
+  }
+  stack(a.top, a.bottom, [
+    top(c),
+    space(),
+    captions(f, c, words, f.by({ square: 5, portrait: 7, story: 9, landscape: 0 })),
+    space(),
+    rule(f, c, "rule", ink, 1),
+    foot(c, f.by({ square: 60, portrait: 64, story: 72, landscape: 0 })),
+  ]);
+});
+
+/** A photo of blue hills and a dark page side by side, the speaker on a glass chip laid across the seam, so half of it
+ *  frosts the photo and half the page. Its tint is a shade lighter than the page, so the half on the page still shows
+ *  as glass instead of vanishing into it. */
+const splitFrame = template("split-frame", "Split Frame", { color: "#111519" }, INK, (f) => {
+  const pale = "#e8eef2";
+  const pane: Glass = { tint: "#2a3540", strength: 0.55, frost: 26, corner: 40, edge: 1.5 };
+  const title: Style = { font: ARCHIVO, size: f.by({ square: 40, portrait: 50, story: 54, landscape: 48 }), weight: 600, color: pale, lineHeight: 1.1 };
+  const words: Style = { font: ARCHIVO, size: f.by({ square: 48, portrait: 54, story: 62, landscape: 58 }), weight: 500, color: pale, highlight: "#bcd7e6", lineHeight: 1.28 };
+  const name: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 28, story: 31, landscape: 30 }), weight: 600, color: WHITE };
+  const handle: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 400, color: WHITE, opacity: QUIET };
+  const time: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 500, color: pale, opacity: QUIET };
+  const portrait: Portrait = { fill: "#bcd7e6", ink: "#111519" };
+  const a = area(f);
+
+  /** The sound and the time, side by side. */
+  const foot = (c: Column, h: number, gap = 0): Block => row(f, h, gap, (y, height) => {
+    f.add("visual", "main", c.x, y, f.px(300), height, { visual: "bars", color: "#9fc0d2" });
+    const timeH = f.lines(time.size!, 1, 1.3);
+    f.add("time", "main", c.x + f.px(330), y + (height - timeH) / 2, f.px(300), timeH, { align: "left", ...time });
+  });
+  /** The chip: the speaker's photo with their name and handle beside it, on glass. */
+  const chip = (x: number, y: number, w: number, d: number) => {
+    const inset = 26;
+    const inner = column(x + f.px(inset), x + w - f.px(inset));
+    card(f, "chip", x, y, w, inset, pane, [byline(f, inner, d, portrait, name, handle)]);
+    return f.px(d + inset * 2);
+  };
+
+  if (f.wide) {
+    const seam = f.px(860);
+    panel(f, "c68c792e", 0, 0, seam, f.height, { crop: { x: 0.3, y: 0, zoom: 1 }, loop: "slowZoom" });
+    chip(seam - f.px(250), a.bottom - f.px(140), f.px(500), 88);
+    const right = column(seam + f.px(110), a.right);
+    stack(a.top, a.bottom, [heading(f, right, title, 2), space(), captions(f, right, words, 5), space(), foot(right, 52)]);
+    return;
+  }
+  const seam = f.height * f.by({ square: 0.4, portrait: 0.44, story: 0.42, landscape: 0 });
+  panel(f, "c68c792e", 0, 0, f.width, seam, { loop: "slowZoom" });
+  const d = f.by({ square: 72, portrait: 84, story: 96, landscape: 0 });
+  const chipH = f.px(d + 52);
+  chip(a.left, seam - chipH / 2, f.px(f.by({ square: 520, portrait: 560, story: 620, landscape: 0 })), d);
+  const c = column(a.left, a.right);
+  stack(seam + chipH / 2 + f.px(f.by({ square: 30, portrait: 44, story: 60, landscape: 0 })), a.bottom, [
+    heading(f, c, title, 2),
+    space(),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 5, landscape: 0 })),
+    space(),
+    foot(c, f.by({ square: 40, portrait: 46, story: 56, landscape: 0 })),
+  ]);
+});
+
+/** The sea at sunset, full bleed, and the words in a glass pill near the foot, as captions sit on a video. */
+const captionPill = template("caption-pill", "Caption Pill", { color: "#3a2a2a", to: "#140d10", angle: 180 }, INK, (f) => {
+  backdrop(f, "79f1d53f", { adjust: { brightness: 0.92 }, crop: { x: 0, y: 0, zoom: 1 }, loop: "slowZoom" });
+  const pane: Glass = { tint: "#100a0c", strength: 0.44, frost: 24, corner: 999, edge: 1.5 };
+  const title: Style = { font: OUTFIT, size: f.by({ square: 40, portrait: 46, story: 52, landscape: 48 }), weight: 600, color: WHITE, shadow: true, lineHeight: 1.12 };
+  const words: Style = { font: OUTFIT, size: f.by({ square: 50, portrait: 54, story: 60, landscape: 56 }), weight: 600, color: WHITE, highlight: WHITE, align: "center", lineHeight: 1.25 };
+  const name: Style = { font: OUTFIT, size: f.by({ square: 27, portrait: 28, story: 31, landscape: 30 }), weight: 600, color: WHITE, shadow: true };
+  const handle: Style = { font: OUTFIT, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 400, color: WHITE, opacity: 0.85, shadow: true };
+  const portrait: Portrait = { fill: "#ffd9b8", ink: "#3a2a2a", rim: WHITE };
+  const a = area(f);
+  const c = column(a.left, a.right);
+  const lines = 2;
+  const inset = f.by({ square: 30, portrait: 32, story: 36, landscape: 32 });
+  const pillW = f.wide ? f.px(1400) : a.w;
+  const pillX = (f.width - pillW) / 2;
+  const inner = column(pillX + f.px(64), pillX + pillW - f.px(64));
+  const pill: Blocks = [captions(f, inner, words, lines)];
+  const pillH = measure(pill) + f.px(inset) * 2;
+  const pillY = a.bottom - pillH;
+
+  stack(a.top, pillY, [
+    byline(f, c, f.by({ square: 60, portrait: 64, story: 72, landscape: 64 }), portrait, name, handle),
+    heading(f, column(a.left, f.wide ? f.px(1200) : a.right), title, 2, f.by({ square: 22, portrait: 30, story: 40, landscape: 28 })),
+    space(),
+    bars(f, f.width / 2 - f.px(120), f.px(240), f.by({ square: 44, portrait: 50, story: 60, landscape: 52 }), WHITE, 0),
+    space(0.12),
+  ]);
+  card(f, "pill", pillX, pillY, pillW, inset, pane, pill);
+});
+
+/** A magazine page in black and white: a microphone in mono across the top, a serif headline, the words in a plain
+ *  sans, hairlines between. */
+const editorial = template("editorial", "Editorial", { color: "#f5f4f0" }, PAPER, (f) => {
+  const ink = "#111111";
+  const title: Style = { font: SERIF, size: f.by({ square: 58, portrait: 72, story: 82, landscape: 80 }), weight: 400, color: ink, lineHeight: 1.04, letterSpacing: -10 };
+  const words: Style = { font: INTER, size: f.by({ square: 46, portrait: 50, story: 58, landscape: 54 }), weight: 500, color: ink, highlight: ink, lineHeight: 1.3 };
+  const meta: Style = { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 600, color: ink, uppercase: true, letterSpacing: 120 };
+  const name: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 600, color: ink };
+  const handle: Style = { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 400, color: ink, opacity: QUIET };
+  const portrait: Portrait = { fill: ink, ink: "#f5f4f0" };
+  const a = area(f);
+
+  /** The episode on the left of a line, the clip's time on the right, in small spaced capitals. */
+  const metaRow = (c: Column, gap = 0): Block => {
+    const h = f.lines(meta.size!, 1, 1.25);
+    return { h, gap: f.px(gap), draw: (y) => {
+      f.add("text", "episode", c.x, y, c.w / 2, h, { text: "Episode 00", align: "left", lineHeight: 1.25, ...meta });
+      f.add("time", "main", c.x + c.w / 2, y, c.w / 2, h, { align: "right", lineHeight: 1.25, ...meta });
+    } };
+  };
+  const foot = (c: Column, d: number): Block => byline(f, c, d, portrait, name, handle, 0, (y, h) => {
+    f.add("visual", "main", c.x + c.w - f.px(180), y + (h - f.px(36)) / 2, f.px(180), f.px(36), { visual: "bars", color: ink });
+  });
+  const mono: PhotoLook = { filter: "mono", adjust: { contrast: 1.05 } };
+
+  if (f.wide) {
+    const photoW = f.px(780);
+    panel(f, "b878edc4", a.left, a.top, photoW, a.h, mono);
+    const c = column(a.left + photoW + f.px(80), a.right);
+    stack(a.top, a.bottom, [metaRow(c), rule(f, c, "rule", ink, 1, 14), heading(f, c, title, 4, 28), space(), captions(f, c, words, 4), space(), rule(f, c, "rule-foot", ink, 1), foot(c, 60)]);
+    return;
+  }
+  const c = column(a.left, a.right);
+  const photoH = f.px(f.by({ square: 300, portrait: 440, story: 600, landscape: 0 }));
+  panel(f, "b878edc4", a.left, a.top, a.w, photoH, mono);
+  stack(a.top + photoH, a.bottom, [
+    metaRow(c, f.by({ square: 22, portrait: 28, story: 40, landscape: 0 })),
+    rule(f, c, "rule", ink, 1, 12),
+    heading(f, c, title, 3, f.by({ square: 18, portrait: 26, story: 36, landscape: 0 })),
+    space(),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 4, landscape: 0 })),
+    space(),
+    rule(f, c, "rule-foot", ink, 1),
+    foot(c, f.by({ square: 52, portrait: 58, story: 66, landscape: 0 })),
+  ]);
+});
+
+/** Pale dunes at dusk, the words large over the sky, and a band of glass the full width of the frame carrying the
+ *  speaker, the sound and the time. */
+const glassBand = template("glass-band", "Glass Band", { color: "#5a4a45", to: "#241b19", angle: 180 }, INK, (f) => {
+  // Taken down to dusk: at full light the sky and sand were too pale for the words still to come.
+  backdrop(f, "3b47c880", { adjust: { brightness: 0.56, contrast: 1.1 }, crop: { x: f.by({ square: 0.2, portrait: 0.2, story: 0.3, landscape: 0 }), y: 0, zoom: 1 }, loop: "slowZoom" });
+  const pane: Glass = { tint: WHITE, strength: 0.14, frost: 26, corner: 0, edge: 1.5 };
+  const title: Style = { font: DM_SANS, size: f.by({ square: 34, portrait: 38, story: 42, landscape: 40 }), weight: 500, color: WHITE, opacity: 0.9, shadow: true };
+  const words: Style = { font: DM_SANS, size: f.by({ square: 56, portrait: 64, story: 72, landscape: 66 }), weight: 700, color: WHITE, highlight: WHITE, shadow: true, align: "center", lineHeight: 1.2 };
+  const name: Style = { font: DM_SANS, size: f.by({ square: 28, portrait: 30, story: 33, landscape: 32 }), weight: 600, color: WHITE };
+  const handle: Style = { font: DM_SANS, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 400, color: WHITE, opacity: QUIET };
+  const time: Style = { font: DOTS, size: f.by({ square: 62, portrait: 64, story: 70, landscape: 68 }), weight: 400, color: WHITE, clock: "elapsed" };
+  const portrait: Portrait = { fill: "#f3e3da", ink: "#4a3833", rim: WHITE };
+  const a = area(f);
+  const c = column(a.left, a.right);
+  const d = f.by({ square: 76, portrait: 84, story: 96, landscape: 88 });
+  const inset = f.by({ square: 34, portrait: 38, story: 44, landscape: 40 });
+  const bandH = f.px(d + inset * 2);
+  const bandY = f.wide ? a.bottom - bandH : f.height * f.by({ square: 0.74, portrait: 0.74, story: 0.68, landscape: 0 }) - bandH / 2;
+
+  glass(f, "band", 0, bandY, f.width, bandH, pane);
+  stack(bandY + f.px(inset), bandY + bandH - f.px(inset), [byline(f, column(a.left, a.left + f.px(f.wide ? 560 : 440)), d, portrait, name, handle, 0, (y, h) => {
+    const timeW = f.px(170);
+    const timeH = f.lines(time.size!, 1, 1.2);
+    f.add("time", "main", a.right - timeW, y + (h - timeH) / 2, timeW, timeH, { ...time, align: "right" });
+    const barsX = a.left + f.px(f.wide ? 640 : 470);
+    f.add("visual", "main", barsX, y + h * 0.18, a.right - timeW - f.px(30) - barsX, h * 0.64, { visual: "bars", color: WHITE });
+  })]);
+  stack(a.top, bandY - f.px(40), [heading(f, f.wide ? column(a.left, f.px(1100)) : c, title, 2), space(), captions(f, c, words, f.by({ square: 3, portrait: 4, story: 5, landscape: 3 })), space(f.wide ? 0.5 : 0.8)]);
+});
+
+/** A studio microphone in the dark, and under it a smoked glass card: on air, the title, the words, the speaker and the
+ *  sound as a wave. */
+const studio = template("studio", "Studio", { color: "#17181a", to: "#08090a", angle: 180 }, INK, (f) => {
+  backdrop(f, "d61ed0d3", { adjust: { brightness: 0.95, contrast: 1.05 }, crop: { x: f.by({ square: 0.1, portrait: 0.05, story: 0, landscape: 0 }), y: f.by({ square: -0.3, portrait: -0.3, story: -0.2, landscape: 0 }), zoom: f.by({ square: 1.1, portrait: 1.1, story: 1, landscape: 1 }) } });
+  const pane: Glass = { tint: "#0c0d0f", strength: 0.4, frost: 30, corner: 40, edge: 1.5 };
+  const red = "#ff4b3e";
+  const air: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 700, color: WHITE, uppercase: true, letterSpacing: 140 };
+  const title: Style = { font: ARCHIVO, size: f.by({ square: 38, portrait: 44, story: 48, landscape: 46 }), weight: 700, color: WHITE, lineHeight: 1.1 };
+  const words: Style = { font: ARCHIVO, size: f.by({ square: 48, portrait: 52, story: 60, landscape: 54 }), weight: 500, color: WHITE, highlight: "#d92d20", lineHeight: 1.28 };
+  const name: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 600, color: WHITE };
+  const handle: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 400, color: WHITE, opacity: QUIET };
+  const time: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 500, color: WHITE, opacity: QUIET, clock: "elapsed" };
+  const portrait: Portrait = { fill: "#2a2c30", ink: WHITE, rim: WHITE };
+  const a = area(f);
+
+  /** A red light that breathes beside "On air", and the time played at the far right. */
+  const onAir = (c: Column): Block => {
+    const h = f.lines(air.size!, 1, 1.4);
+    return { h, gap: 0, draw: (y) => {
+      const dot = f.px(14);
+      f.add("shape", "light", c.x, y + (h - dot) / 2, dot, dot, { shape: "ellipse", fill: red, loop: "flash" });
+      f.add("text", "air", c.x + dot + f.px(14), y + (h - f.lines(air.size!, 1, 1.25)) / 2, f.px(300), f.lines(air.size!, 1, 1.25), { text: "On air", align: "left", lineHeight: 1.25, ...air });
+      f.add("time", "main", c.x + c.w - f.px(200), y, f.px(200), h, { ...time, align: "right" });
+    } };
+  };
+  const foot = (c: Column, d: number, gap: number): Block => byline(f, c, d, portrait, name, handle, gap, (y, h) => {
+    f.add("visual", "main", c.x + c.w - f.px(260), y + h * 0.15, f.px(260), h * 0.7, { visual: "wave", color: WHITE });
+  });
+
+  if (f.wide) {
+    const x = f.px(1000);
+    const inner = column(x + f.px(52), a.right - f.px(52));
+    glass(f, "card", x, a.top, a.right - x, a.h, pane);
+    stack(a.top + f.px(52), a.bottom - f.px(52), [onAir(inner), heading(f, inner, title, 3, 30), space(), captions(f, inner, words, 4), space(), foot(inner, 64, 0)]);
+    return;
+  }
+  const inset = f.by({ square: 40, portrait: 46, story: 52, landscape: 0 });
+  const inner = column(a.left + f.px(inset), a.right - f.px(inset));
+  const blocks: Blocks = [
+    onAir(inner),
+    heading(f, inner, title, 2, f.by({ square: 18, portrait: 26, story: 36, landscape: 0 })),
+    captions(f, inner, words, f.by({ square: 3, portrait: 3, story: 4, landscape: 0 }), f.by({ square: 18, portrait: 28, story: 40, landscape: 0 })),
+    foot(inner, f.by({ square: 56, portrait: 62, story: 70, landscape: 0 }), f.by({ square: 22, portrait: 32, story: 44, landscape: 0 })),
+  ];
+  const h = measure(blocks) + f.px(inset) * 2;
+  card(f, "card", a.left, a.bottom - h, a.w, inset, pane, blocks);
+});
+
+/** Rain on a window at dusk behind heavily frosted glass, the words set as a quotation in a fine serif. */
+const rainWindow = template("rain-window", "Rain Window", { color: "#26303a", to: "#0f141a", angle: 180 }, INK, (f) => {
+  backdrop(f, "57662708", { filter: "cool", adjust: { brightness: 0.68, saturation: 0.4 }, loop: "slowZoom" });
+  const pane: Glass = { tint: "#0d141c", strength: 0.42, frost: 48, corner: 44, edge: 1.5 };
+  const words: Style = { font: SERIF, size: f.by({ square: 58, portrait: 66, story: 74, landscape: 68 }), weight: 400, color: WHITE, highlight: "#dce8f2", lineHeight: 1.16 };
+  const title: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 500, color: WHITE, opacity: 0.82 };
+  const name: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 600, color: WHITE };
+  const handle: Style = { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 400, color: WHITE, opacity: QUIET };
+  const portrait: Portrait = { fill: "#c9d8e4", ink: "#1a242e", rim: WHITE };
+  const a = area(f);
+  /** An opening quote mark set in the words' own serif, `size` design pixels: a plain mark, where the drawn icon read
+   *  as "99". The serif draws it in the top fifth of its letter's box, so the row is only that tall. */
+  const quote = (c: Column, size: number, gap: number): Block => row(f, size * 0.3, gap, (y) => {
+    f.add("text", "quote", c.x - f.px(size * 0.03), y, f.px(size * 0.5), f.px(size), { text: "“", font: SERIF, size, lineHeight: 1, align: "left", color: WHITE, opacity: 0.6 });
+  });
+  const foot = (c: Column, d: number): Block => byline(f, c, d, portrait, name, handle, 0, (y, h) => {
+    f.add("visual", "main", c.x + c.w - f.px(170), y + (h - f.px(36)) / 2, f.px(170), f.px(36), { visual: "bars", color: WHITE });
+  });
+
+  const w = f.wide ? f.px(1280) : a.w;
+  const x = (f.width - w) / 2;
+  const inset = f.by({ square: 48, portrait: 56, story: 64, landscape: 60 });
+  const inner = column(x + f.px(inset), x + w - f.px(inset));
+  // The title leads, so a title of one line leaves its spare room above the quote mark rather than over the speaker.
+  const blocks: Blocks = [
+    heading(f, inner, title, 2),
+    quote(inner, f.by({ square: 200, portrait: 230, story: 260, landscape: 210 }), f.by({ square: 26, portrait: 34, story: 44, landscape: 30 })),
+    captions(f, inner, words, f.by({ square: 4, portrait: 5, story: 6, landscape: 4 }), f.by({ square: 10, portrait: 14, story: 20, landscape: 12 })),
+    rule(f, inner, "rule", WHITE, 0.3, f.by({ square: 24, portrait: 34, story: 48, landscape: 30 })),
+    foot(inner, f.by({ square: 56, portrait: 62, story: 70, landscape: 60 })),
+  ];
+  const h = measure(blocks) + f.px(inset) * 2;
+  card(f, "card", x, a.top + (a.h - h) / 2, w, inset, pane, blocks);
+});
+
+/** Clouds over mountains, pale and cool: the speaker in the middle inside a ring of dots that fills as the clip plays,
+ *  dark type, and a light pane of glass under the words. */
+const halo = template("halo", "Halo", { color: "#d9dee3", to: "#b8c0c8", angle: 180 }, PAPER, (f) => {
+  backdrop(f, "cf2511b2", { adjust: { brightness: 1.04, saturation: 0.55, contrast: 0.92 }, crop: { x: f.by({ square: 0.2, portrait: 0.25, story: 0.3, landscape: 0 }), y: f.by({ square: -0.4, portrait: -0.4, story: 0, landscape: -0.5 }), zoom: f.by({ square: 1.2, portrait: 1.15, story: 1, landscape: 1 }) }, loop: "slowZoom" });
+  const ink = "#15191e";
+  // Light enough that dark words still to come, at half strength, read on it over the darkest of the mountains.
+  const pane: Glass = { tint: WHITE, strength: 0.7, frost: 28, corner: 40, edge: 2 };
+  const title: Style = { font: OUTFIT, size: f.by({ square: 38, portrait: 44, story: 50, landscape: 46 }), weight: 600, color: ink, align: "center", lineHeight: 1.1 };
+  const words: Style = { font: OUTFIT, size: f.by({ square: 48, portrait: 52, story: 60, landscape: 54 }), weight: 500, color: ink, highlight: ink, align: "center", lineHeight: 1.26 };
+  const name: Style = { font: OUTFIT, size: f.by({ square: 30, portrait: 32, story: 36, landscape: 34 }), weight: 600, color: ink, align: "center" };
+  const handle: Style = { font: OUTFIT, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 400, color: ink, opacity: QUIET, align: "center" };
+  const portrait: Portrait = { fill: ink, ink: "#e9edf1", rim: WHITE };
+  const a = area(f);
+
+  /** The ring of dots, `d` across, with the speaker inside. */
+  const speaker = (c: Column, d: number, gap = 0): Block => row(f, d, gap, (y, h) => {
+    const cx = c.x + c.w / 2;
+    f.add("visual", "main", cx - h / 2, y, h, h, { visual: "ring", color: ink });
+    avatarAt(f, cx, y + h / 2, d * 0.7, portrait);
+  });
+  /** A light pane holding the speaker's name and handle over `lines` of the words, so dark type always has a light
+   *  ground whatever the clouds do behind it. */
+  const nameAndWords = (c: Column, lines: number, inset: number, gap = 0): Block => {
+    const inner = column(c.x + f.px(inset), c.x + c.w - f.px(inset));
+    const nameH = f.lines(name.size!, 1, 1.3);
+    const handleH = f.lines(handle.size!, 1, 1.3);
+    const who = row(f, (nameH + handleH) / f.unit, 0, (y) => {
+      f.add("name", "main", inner.x, y, inner.w, nameH, name);
+      f.add("handle", "main", inner.x, y + nameH, inner.w, handleH, handle);
+    });
+    const body = captions(f, inner, words, lines, 22);
+    const blocks = [who, body];
+    return { h: measure(blocks) + f.px(inset) * 2, gap: f.px(gap), draw: (y) => card(f, "card", c.x, y, c.w, inset, pane, blocks) };
+  };
+
+  if (f.wide) {
+    const left = column(a.left, f.px(760));
+    stack(a.top, a.bottom, [space(), speaker(left, 480), space()]);
+    const right = column(f.px(860), a.right);
+    stack(a.top, a.bottom, [space(), heading(f, right, title, 2), nameAndWords(right, 3, 44, 40), space()]);
+    return;
+  }
+  const c = column(a.left, a.right);
+  stack(a.top, a.bottom, [
+    heading(f, c, title, 2),
+    space(),
+    speaker(c, f.by({ square: 330, portrait: 440, story: 540, landscape: 0 })),
+    space(),
+    nameAndWords(c, f.by({ square: 2, portrait: 3, story: 3, landscape: 0 }), f.by({ square: 30, portrait: 36, story: 44, landscape: 0 })),
+  ]);
+});
+
+/** A live room, the way a Space looks while it is on: city light trails under dark glass, a red live tag, an
+ *  invitation to listen, the host, and the words. */
+const liveRoom = template("live-room", "Live Room", { color: "#2a1a10", to: "#0d0806", angle: 180 }, INK, (f) => {
+  backdrop(f, "2ec6bb82", { adjust: { brightness: 0.62, saturation: 0.95, blur: 4 }, loop: "slowZoom" });
+  const pane: Glass = { tint: "#0d0b0a", strength: 0.4, frost: 32, corner: 44, edge: 1.5 };
+  const red = "#ff3b30";
+  const tag: Style = { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 700, color: WHITE, uppercase: true, letterSpacing: 120 };
+  const invite: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 500, color: WHITE, opacity: 0.85 };
+  const title: Style = { font: INTER, size: f.by({ square: 40, portrait: 46, story: 48, landscape: 48 }), weight: 700, color: WHITE, lineHeight: 1.12, letterSpacing: -10 };
+  const words: Style = { font: INTER, size: f.by({ square: 48, portrait: 52, story: 60, landscape: 54 }), weight: 600, color: WHITE, highlight: WHITE, lineHeight: 1.28 };
+  const name: Style = { font: INTER, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 27 }), weight: 600, color: WHITE };
+  const handle: Style = { font: INTER, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 400, color: WHITE, opacity: QUIET };
+  const portrait: Portrait = { fill: "#ffcfb0", ink: "#2a1a10", rim: WHITE };
+  const a = area(f);
+
+  /** The red live tag on the left, an invitation to listen on the right: words, not a count of listeners, so an export
+   *  nobody edited never claims an audience it did not have. */
+  const top = (c: Column): Block => {
+    const h = f.px(f.by({ square: 46, portrait: 46, story: 50, landscape: 46 }));
+    return { h, gap: 0, draw: (y) => {
+      const tagH = f.lines(tag.size!, 1, 1.25);
+      const w = f.px(tag.size! * 4);
+      f.add("shape", "tag", c.x, y, w, h, { shape: "rect", radius: 0.22, fill: red });
+      f.add("text", "live", c.x + f.px(16), y + (h - tagH) / 2, w - f.px(24), tagH, { text: "Live", align: "left", lineHeight: 1.25, ...tag });
+      const inviteH = f.lines(invite.size!, 1, 1.25);
+      const glyph = invite.size! * 1.1;
+      const textW = f.px(invite.size! * 4.8);
+      f.add("text", "listen", c.x + c.w - textW, y + (h - inviteH) / 2, textW, inviteH, { text: "Listen in", align: "right", lineHeight: 1.25, ...invite });
+      icon(f, "listen", "headphones", c.x + c.w - textW - f.px(glyph + 10), y + (h - f.px(glyph)) / 2, glyph, WHITE, 0.85);
+    } };
+  };
+  const host = (c: Column, d: number, gap: number): Block => byline(f, c, d, portrait, name, handle, gap, (y, h) => {
+    f.add("visual", "main", c.x + c.w - f.px(240), y + h * 0.2, f.px(240), h * 0.6, { visual: "bars", color: WHITE });
+  });
+
+  const w = f.wide ? f.px(1360) : a.w;
+  const x = (f.width - w) / 2;
+  const inset = f.by({ square: 44, portrait: 50, story: 56, landscape: 52 });
+  const inner = column(x + f.px(inset), x + w - f.px(inset));
+  const blocks: Blocks = [
+    top(inner),
+    heading(f, inner, title, 2, f.by({ square: 26, portrait: 34, story: 46, landscape: 30 })),
+    host(inner, f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), f.by({ square: 24, portrait: 32, story: 44, landscape: 28 })),
+    rule(f, inner, "rule", WHITE, 0.18, f.by({ square: 22, portrait: 30, story: 40, landscape: 26 })),
+    captions(f, inner, words, f.by({ square: 3, portrait: 4, story: 5, landscape: 3 }), f.by({ square: 20, portrait: 28, story: 40, landscape: 24 })),
+  ];
+  const h = measure(blocks) + f.px(inset) * 2;
+  card(f, "card", x, a.top + (a.h - h) / 2, w, inset, pane, blocks);
 });
 
 /** The podcast templates in the order the picker shows them. */
 export const PODCAST_TEMPLATES: TemplateChoice[] = [
-  royalCrest,
-  gildedFrame,
-  emeraldSalon,
-  bordeaux,
-  gatsbyDeco,
-  ivoryLetterpress,
-  marbleGold,
-  midnightOpera,
-  heritageBroadcast,
-  monogram,
-  gazette,
-  imperialPurple,
-  champagneToast,
-  noirCinema,
-  laureate,
-  library,
-  sapphireGala,
-  cartoucheFrame,
-  baroque,
-  quietLuxury,
+  amberFog,
+  slateMist,
+  nightGlass,
+  paleGlass,
+  nowPlaying,
+  dotClock,
+  captionPill,
+  splitFrame,
+  ashHorizon,
+  glassBand,
+  bigType,
+  editorial,
+  studio,
+  rainWindow,
+  halo,
+  liveRoom,
 ];

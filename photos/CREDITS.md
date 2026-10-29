@@ -67,3 +67,14 @@ These are the people who took them, and where each one was found.
 - Tree against a pink evening sky (`00541370.webp`), by Will Presley: https://wordpress.org/photos/photo/87562029c7/
 - Prayer flags at sunrise (`f3f7cb43.webp`), by Prashant Sinkhwal: https://wordpress.org/photos/photo/524677b5b4/
 - Orange sunset over the sea (`79f1d53f.webp`), by Bigul Malayi: https://wordpress.org/photos/photo/14764d9041/
+
+## Mist and atmosphere
+
+- Wooden jetty in thick fog (`fba5d317.webp`), by W.carter: https://commons.wikimedia.org/wiki/File:Jetty_in_fog_at_Holl%C3%A4ndar%C3%B6d_1.jpg
+- Morning mist on a lake (`4a139be3.webp`), by U.S. Department of Agriculture: https://commons.wikimedia.org/wiki/File:Mist_on_Lake_Whatcom,_2019.jpg
+- Lone tree in a foggy meadow (`ff81826c.webp`), by Ted Moravec: https://commons.wikimedia.org/wiki/File:A_Tree_in_Fog_-_Orlick%C3%A9_hory.jpg
+- Pale sand dunes before sunset (`3b47c880.webp`), by Gerda Arendt: https://commons.wikimedia.org/wiki/File:Sand_dunes_before_sunset,_Len%C3%A7%C3%B3is_Maranhenses.jpg
+- Ocean view towards the pale yellow horizon (`562ff8ce.webp`), by Colin Maynard: https://commons.wikimedia.org/wiki/File:Ocean_view_towards_the_pale_yellow_horizon_(Unsplash).jpg
+- Rain on window (`57662708.webp`), by Francesco Gallarotti: https://commons.wikimedia.org/wiki/File:Rain_on_window_(Unsplash).jpg
+- Clouds over the Caucasus Mountains (`cf2511b2.webp`), by Sylwia Bartyzel: https://commons.wikimedia.org/wiki/File:Clouds_over_the_Caucasus_Mountains_(Unsplash).jpg
+- City towers at night, out of focus (`5d9b67b8.webp`), by Pavel Volkov: https://commons.wikimedia.org/wiki/File:%D0%9A%D1%83%D1%82%D1%83%D0%B7%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F,_%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0,_%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D1%8F_(Unsplash).jpg

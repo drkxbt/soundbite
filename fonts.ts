@@ -72,6 +72,8 @@ export const FONTS: FontSpec[] = [
   font("jetbrains-mono", "JetBrains Mono", "Mono", true),
   font("space-mono", "Space Mono", "Mono"),
   font("courier-prime", "Courier Prime", "Mono"),
+  font("doto", "Doto", "Mono", true),
+  font("handjet", "Handjet", "Mono", true),
 ];
 
 /** One file of a font: the weights it covers (one, or a range for a variable font) and the characters it holds. */

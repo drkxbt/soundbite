@@ -44,6 +44,12 @@ export async function loadPictures(): Promise<Record<string, Blob>> {
 }
 
 /** Keeps exactly these pictures: new ones are stored, ones no longer listed are let go. */
+/** The pictures that may be kept for the next visit: all but KLIPY's, whose terms say its media is loaded from KLIPY
+ *  and never kept, so a design using one shows it this visit and not after a reload. */
+export function keepable(pictures: Record<string, Blob | string>): Record<string, Blob | string> {
+  return Object.fromEntries(Object.entries(pictures).filter(([key]) => !key.startsWith("stock-klipy-")));
+}
+
 export async function savePictures(pictures: Record<string, Blob | string>): Promise<void> {
   try {
     const database = await open();

@@ -141,6 +141,34 @@ test("metal finishes are kept by name, and anything that only looks like one is 
   assert.equal(layerIn({ fill: "linear-gradient(red, blue)" }).fill, undefined);
 });
 
+test("frosted glass and a shape's shadow are kept, the blur held between none and sixty pixels", () => {
+  const glass = layerIn({ shape: "rect", radius: 0.06, fill: "#ffffff", opacity: 0.16, frost: 30, shadow: true, stroke: "#ffffff", strokeWidth: 2 });
+  assert.equal(glass.frost, 30);
+  assert.equal(glass.shadow, true);
+  assert.equal(layerIn({ frost: 200 }).frost, 60);
+  assert.equal(layerIn({ frost: -4 }).frost, 0);
+  assert.equal(layerIn({ frost: "30" }).frost, undefined);
+});
+
+test("the ring of dots is kept as a sound style, for a layer and for the whole kit", () => {
+  assert.equal(layerIn({ kind: "visual", visual: "ring" }).visual, "ring");
+  assert.deepEqual(parseKit(JSON.stringify({ visual: "ring" })), { visual: "ring" });
+});
+
+test("a clock keeps how it tells the time, and anything else is left to the default", () => {
+  for (const clock of ["both", "elapsed", "remaining", "percent"]) assert.equal(layerIn({ kind: "time", clock }).clock, clock);
+  assert.equal(layerIn({ kind: "time", clock: "countdown" }).clock, undefined);
+  assert.equal(layerIn({ kind: "time", clock: 3 }).clock, undefined);
+});
+
+test("the one-tone filters and a library photo's key are kept on a picture", () => {
+  for (const filter of ["amber", "slate", "ash"]) assert.equal(layerIn({ kind: "image", filter }).filter, filter);
+  const photo = layerIn({ kind: "image", image: "photo:4a139be3", backdrop: true, mask: "rect", filter: "amber", adjust: { brightness: 0.8 }, crop: { x: 0.2, y: 0, zoom: 1 } });
+  assert.equal(photo.image, "photo:4a139be3");
+  assert.equal(photo.filter, "amber");
+  assert.equal(layerIn({ kind: "image", filter: "sepia" }).filter, undefined);
+});
+
 test("the new kinds come back with their own fields, checked and held in range", () => {
   const chart = layerIn({ kind: "chart", chart: "donut", data: [{ label: "Yes", value: 62, color: "#00bf63" }, { label: "No", value: Infinity }, { label: 3, value: 1 }, { label: "Maybe", value: 5e12, color: "url(x)" }], prefix: "$1234567890", showGrid: true });
   assert.equal(chart.kind, "chart");

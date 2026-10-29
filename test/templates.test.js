@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { METALS, THEMES } from "@drkxbt/audiogram";
+import { readFileSync } from "node:fs";
+import { FILTERS, THEMES } from "@drkxbt/audiogram";
 import { FONTS as SHIPPED } from "../dist/fonts.js";
 import { parseKit } from "../dist/kit.js";
 import { PODCAST_TEMPLATES } from "../dist/templates.js";
@@ -15,6 +16,15 @@ const FONTS = new Set(SHIPPED.map((font) => (font.variable ? `${font.name} Varia
 // The most a saved kit keeps of one drawing, as kit.ts counts it.
 const MOST_PATHS = 64;
 const MOST_PATH_DATA = 60_000;
+// The bundled library a template's "photo:" pictures come from.
+const PHOTOS = new Set(JSON.parse(readFileSync(new URL("../photos/photos.json", import.meta.url), "utf8")).map((photo) => photo.id));
+// The longest page of captions the editor shows at once on each shape, in characters, as Audiogram's editor splits them.
+const PAGE = { square: 32, portrait: 34, story: 32, landscape: 46 };
+// A long episode title, in characters: "Why we shipped the whole roadmap in public" and a clause more.
+const LONG_TITLE = 60;
+// The kinds of layer that are words, and the ones among them that are only ornament, which may be larger and fainter.
+const WORDS = new Set(["title", "name", "handle", "time", "text", "links"]);
+const ORNAMENTS = new Set(["text-quote"]);
 
 const every = (check) => {
   for (const choice of PODCAST_TEMPLATES) for (const layout of LAYOUTS) check(choice.make(layout).layers, `${choice.id} ${layout}`, layout, choice.make(layout));
@@ -32,6 +42,11 @@ function corners(layer, width, height) {
     cy + sx * halfW * Math.sin(angle) + sy * halfH * Math.cos(angle),
   ]);
 }
+
+/** Whether box `inner` lies inside box `outer`, both in fractions of the frame. */
+const within = (inner, outer) => inner.x >= outer.x - 1e-6 && inner.y >= outer.y - 1e-6 && inner.x + inner.w <= outer.x + outer.w + 1e-6 && inner.y + inner.h <= outer.y + outer.h + 1e-6;
+
+const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /** A #rrggbb colour's relative luminance, as WCAG works out contrast. */
 function luminance(hex) {
@@ -56,10 +71,10 @@ function middleOf(page) {
   return `#${[16, 8, 0].map((shift) => mix(shift).toString(16).padStart(2, "0")).join("")}`;
 }
 
-test("there are twenty templates, each with its own id and name", () => {
-  assert.equal(PODCAST_TEMPLATES.length, 20);
-  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.id)).size, 20);
-  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.name)).size, 20);
+test("there are sixteen templates, each with its own id and a short name of one to three words", () => {
+  assert.equal(PODCAST_TEMPLATES.length, 16);
+  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.id)).size, 16);
+  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.name)).size, 16);
   for (const { id, name } of PODCAST_TEMPLATES) {
     assert.match(id, /^[a-z]+(?:-[a-z]+)*$/, id);
     assert.match(name, /^[A-Z][a-z]+(?: (?:[A-Z][a-z]+|and|of)){0,2}$/, name);
@@ -92,7 +107,7 @@ test("each template has one captions layer, a sound visual, and the speaker's ph
   });
 });
 
-test("the captions sit in the frame's middle band, and their words are large enough to read on a phone", () => {
+test("the captions sit clear of the apps' bands, in words large enough to read on a phone", () => {
   every((layers, where) => {
     const words = layers.find((layer) => layer.kind === "captions");
     assert.ok(words.size >= 46, `${where}: captions at ${words.size}`);
@@ -100,10 +115,132 @@ test("the captions sit in the frame's middle band, and their words are large eno
   });
 });
 
-test("every photo frame has a mask, so a picture is cut to its frame instead of spilling past it", () => {
+test("the longest page of captions the editor shows fits the captions box without losing a line", () => {
+  every((layers, where, layout) => {
+    const [width, height] = SIZES[layout];
+    const unit = Math.min(width, height) / 1080;
+    const words = layers.find((layer) => layer.kind === "captions");
+    const size = words.size * unit;
+    const room = Math.floor((words.h * height) / (size * (words.lineHeight ?? 1.34)));
+    // An average letter is a little over half the size wide; 0.6 leaves room for wide faces and for wrapping.
+    const needed = Math.ceil((PAGE[layout] * 0.6 * size) / (words.w * width));
+    assert.ok(room >= needed, `${where}: room for ${room} lines, a page needs ${needed}`);
+  });
+});
+
+test("the title's box holds every line a sixty-character title needs, on every shape", () => {
+  every((layers, where, layout) => {
+    const [width, height] = SIZES[layout];
+    const unit = Math.min(width, height) / 1080;
+    const title = layers.find((layer) => layer.kind === "title");
+    const size = (title.size ?? 40) * unit;
+    // The lines the painter keeps of a title, as it counts them from the box's height.
+    const room = Math.max(1, Math.floor((title.h * height) / (size * (title.lineHeight ?? 1.15)) + 0.05));
+    // The widest title face here averages 0.51 of its size a letter; 0.56 leaves room for where the lines break.
+    const needed = Math.ceil((LONG_TITLE * 0.56 * size) / (title.w * width));
+    assert.ok(room >= needed, `${where}: room for ${room} lines of title, a long one needs ${needed}`);
+  });
+});
+
+test("words that carry something are set at 26 or more and at three quarters strength or more, to read in a phone's feed", () => {
+  every((layers, where) => {
+    for (const layer of layers) {
+      if (!WORDS.has(layer.kind) || ORNAMENTS.has(layer.id)) continue;
+      assert.ok((layer.size ?? 40) >= 26, `${where}: ${layer.id} at ${layer.size}`);
+      assert.ok(layer.opacity >= 0.75, `${where}: ${layer.id} at opacity ${layer.opacity}`);
+    }
+  });
+});
+
+test("captions over a photo have a darker ground made for them: glass tinted against their colour, or the photo graded down", () => {
+  // This checks how each template is built, not its pixels, which depend on the photo. The painter draws the words
+  // still to come at half strength; rendered, these settings put them near 3:1 on what lies under them.
+  let checked = 0;
+  every((layers, where) => {
+    const index = layers.findIndex((layer) => layer.kind === "captions");
+    const words = layers[index];
+    const under = layers.slice(0, index);
+    const photos = under.filter((layer) => layer.kind === "image" && overlaps(layer, words));
+    if (!photos.length) return;
+    checked++;
+    const light = luminance(words.color) > 0.5;
+    const pane = under.findLast((layer) => layer.frost && within(words, layer));
+    if (pane) {
+      const tint = luminance(pane.fill);
+      if (light) assert.ok(tint < 0.02 && pane.opacity >= 0.4, `${where}: light words on ${pane.fill} glass at ${pane.opacity}`);
+      else assert.ok(tint > 0.9 && pane.opacity >= 0.5, `${where}: dark words on ${pane.fill} glass at ${pane.opacity}`);
+      return;
+    }
+    assert.ok(light, `${where}: dark words straight on a photo`);
+    for (const photo of photos) assert.ok((photo.adjust?.brightness ?? 1) <= 0.62, `${where}: words on ${photo.id} at brightness ${photo.adjust?.brightness ?? 1}`);
+  });
+  assert.ok(checked > 0);
+});
+
+test("every picture frame has a mask, so a picture is cut to its frame instead of spilling past it", () => {
   every((layers, where) => {
     for (const layer of layers) if (layer.kind === "image") assert.ok(layer.mask, `${where}: ${layer.id}`);
   });
+});
+
+test("every photo a template asks for is one the bundled library has, and a backdrop covers the whole frame", () => {
+  let asked = 0;
+  every((layers, where) => {
+    for (const layer of layers) {
+      if (!layer.image?.startsWith("photo:")) continue;
+      asked++;
+      assert.ok(PHOTOS.has(layer.image.slice("photo:".length)), `${where}: ${layer.image} is not in photos.json`);
+      if (layer.backdrop) assert.deepEqual([layer.x, layer.y, layer.w, layer.h], [0, 0, 1, 1], `${where}: ${layer.id}`);
+    }
+  });
+  assert.ok(asked > 0);
+});
+
+test("a photo's filter is one Audiogram paints", () => {
+  every((layers, where) => {
+    for (const layer of layers) if (layer.filter !== undefined) assert.ok(layer.filter in FILTERS, `${where}: ${layer.id} filter ${layer.filter}`);
+  });
+});
+
+test("frosted glass is only on shapes that have an outline to fill, and within the blur the painter allows", () => {
+  let glass = 0;
+  every((layers, where) => {
+    for (const layer of layers) {
+      if (layer.frost === undefined) continue;
+      glass++;
+      assert.equal(layer.kind, "shape", `${where}: ${layer.id}`);
+      assert.notEqual(layer.shape, "line", `${where}: ${layer.id}`);
+      assert.ok(layer.frost > 0 && layer.frost <= 60, `${where}: ${layer.id} frost ${layer.frost}`);
+      assert.ok(layer.fill !== undefined, `${where}: ${layer.id} has no tint`);
+    }
+  });
+  assert.ok(glass > 0);
+});
+
+test("a shape that covers most of the page is see-through glass, so the photo or page under it still shows", () => {
+  every((layers, where) => {
+    for (const layer of layers) {
+      if (layer.kind !== "shape" || layer.shape === "line" || layer.w * layer.h < 0.5) continue;
+      assert.ok(layer.frost > 0 && layer.opacity <= 0.5, `${where}: ${layer.id} covers ${Math.round(layer.w * layer.h * 100)}% and is solid`);
+    }
+  });
+});
+
+test("the sound styles and clock formats the templates use are ones a saved kit keeps", () => {
+  const kept = { visual: new Set(), clock: new Set() };
+  every((layers, where, layout) => {
+    const back = parseKit(JSON.stringify({ layers: { [layout]: layers } })).layers[layout];
+    for (const [index, layer] of layers.entries()) {
+      for (const field of ["visual", "clock", "frost", "filter", "image", "shadow"]) {
+        if (layer[field] !== undefined) assert.deepEqual(back[index]?.[field], layer[field], `${where}: ${layer.id} loses its ${field}`);
+      }
+      if (layer.visual) kept.visual.add(layer.visual);
+      if (layer.clock) kept.clock.add(layer.clock);
+    }
+  });
+  // The set shows the ring of dots and every way of telling the time but the default.
+  assert.ok(kept.visual.has("ring") && kept.visual.has("bars"));
+  assert.deepEqual([...kept.clock].sort(), ["elapsed", "percent", "remaining"]);
 });
 
 test("every font is one Soundbite ships", () => {
@@ -112,22 +249,22 @@ test("every font is one Soundbite ships", () => {
   });
 });
 
-test("every colour is a hex colour, one of the theme's, or a metal", () => {
+test("every colour is a hex colour or one of the theme's, and none is a metal finish", () => {
   every((layers, where) => {
     for (const layer of layers) {
       for (const field of COLOUR_FIELDS) {
         const paint = layer[field];
-        if (paint !== undefined) assert.ok(HEX.test(paint) || THEME_PAINTS.has(paint) || paint in METALS, `${where}: ${layer.id} ${field} is ${paint}`);
+        if (paint !== undefined) assert.ok(HEX.test(paint) || THEME_PAINTS.has(paint), `${where}: ${layer.id} ${field} is ${paint}`);
       }
     }
   });
 });
 
-test("the word being said is marked in a flat colour, since the word on it takes black or white by its lightness", () => {
+test("the word being said reads on its highlight, in the black or white the painter picks for it", () => {
   every((layers, where) => {
     const { highlight } = layers.find((layer) => layer.kind === "captions");
-    assert.ok(highlight !== undefined && !(highlight in METALS), `${where}: highlight is ${highlight}`);
-    // The painter's own choice of ink: black on a light highlight, white on a dark one.
+    // The painter picks the ink only for a six-digit colour; anything else gets black.
+    assert.match(highlight, /^#[0-9a-f]{6}$/i, where);
     const ink = luminance(highlight) > 0.4 ? "#111111" : "#ffffff";
     assert.ok(contrast(ink, highlight) >= 4.5, `${where}: the word on ${highlight} reads at ${contrast(ink, highlight).toFixed(2)}`);
   });
@@ -150,18 +287,13 @@ test("a template's page is a colour or a gradient of two, and its theme is one o
   }
 });
 
-test("the words of a caption not yet said, drawn in the theme's muted colour, read on the page", () => {
+test("words the user adds later, in the theme's colours, read on the page while its photo is still coming", () => {
   for (const choice of PODCAST_TEMPLATES) {
     const { page, theme } = choice.make("portrait");
-    const ratio = contrast(THEMES[theme].muted, middleOf(page));
-    assert.ok(ratio >= 3, `${choice.id}: ${ratio.toFixed(2)}`);
+    const ground = middleOf(page);
+    assert.ok(contrast(THEMES[theme].text, ground) >= 4.5, `${choice.id}: text at ${contrast(THEMES[theme].text, ground).toFixed(2)}`);
+    assert.ok(contrast(THEMES[theme].muted, ground) >= 3, `${choice.id}: muted at ${contrast(THEMES[theme].muted, ground).toFixed(2)}`);
   }
-});
-
-test("no shape covers most of the page, so the page's own colour stays the ground", () => {
-  every((layers, where) => {
-    for (const layer of layers) if (layer.kind === "shape" && layer.shape !== "line") assert.ok(layer.w * layer.h < 0.5, `${where}: ${layer.id} covers ${Math.round(layer.w * layer.h * 100)}%`);
-  });
 });
 
 test("each call lays a template out afresh, so editing one copy leaves the next alone", () => {

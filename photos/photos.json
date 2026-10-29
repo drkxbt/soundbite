@@ -478,5 +478,101 @@
     "credit": "Bigul Malayi",
     "source": "https://wordpress.org/photos/photo/14764d9041/",
     "licence": "CC0"
+  },
+  {
+    "id": "fba5d317",
+    "name": "Wooden jetty in thick fog",
+    "theme": "Mist and atmosphere",
+    "file": "fba5d317.webp",
+    "thumb": "thumbs/fba5d317.webp",
+    "width": 1600,
+    "height": 1067,
+    "credit": "W.carter",
+    "source": "https://commons.wikimedia.org/wiki/File:Jetty_in_fog_at_Holl%C3%A4ndar%C3%B6d_1.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "4a139be3",
+    "name": "Morning mist on a lake",
+    "theme": "Mist and atmosphere",
+    "file": "4a139be3.webp",
+    "thumb": "thumbs/4a139be3.webp",
+    "width": 1600,
+    "height": 1067,
+    "credit": "U.S. Department of Agriculture",
+    "source": "https://commons.wikimedia.org/wiki/File:Mist_on_Lake_Whatcom,_2019.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "ff81826c",
+    "name": "Lone tree in a foggy meadow",
+    "theme": "Mist and atmosphere",
+    "file": "ff81826c.webp",
+    "thumb": "thumbs/ff81826c.webp",
+    "width": 1600,
+    "height": 1074,
+    "credit": "Ted Moravec",
+    "source": "https://commons.wikimedia.org/wiki/File:A_Tree_in_Fog_-_Orlick%C3%A9_hory.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "3b47c880",
+    "name": "Pale sand dunes before sunset",
+    "theme": "Mist and atmosphere",
+    "file": "3b47c880.webp",
+    "thumb": "thumbs/3b47c880.webp",
+    "width": 1600,
+    "height": 1200,
+    "credit": "Gerda Arendt",
+    "source": "https://commons.wikimedia.org/wiki/File:Sand_dunes_before_sunset,_Len%C3%A7%C3%B3is_Maranhenses.jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "562ff8ce",
+    "name": "Ocean view towards the pale yellow horizon",
+    "theme": "Mist and atmosphere",
+    "file": "562ff8ce.webp",
+    "thumb": "thumbs/562ff8ce.webp",
+    "width": 1600,
+    "height": 1067,
+    "credit": "Colin Maynard",
+    "source": "https://commons.wikimedia.org/wiki/File:Ocean_view_towards_the_pale_yellow_horizon_(Unsplash).jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "57662708",
+    "name": "Rain on window",
+    "theme": "Mist and atmosphere",
+    "file": "57662708.webp",
+    "thumb": "thumbs/57662708.webp",
+    "width": 1600,
+    "height": 1067,
+    "credit": "Francesco Gallarotti",
+    "source": "https://commons.wikimedia.org/wiki/File:Rain_on_window_(Unsplash).jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "cf2511b2",
+    "name": "Clouds over the Caucasus Mountains",
+    "theme": "Mist and atmosphere",
+    "file": "cf2511b2.webp",
+    "thumb": "thumbs/cf2511b2.webp",
+    "width": 1600,
+    "height": 1060,
+    "credit": "Sylwia Bartyzel",
+    "source": "https://commons.wikimedia.org/wiki/File:Clouds_over_the_Caucasus_Mountains_(Unsplash).jpg",
+    "licence": "CC0"
+  },
+  {
+    "id": "5d9b67b8",
+    "name": "City towers at night, out of focus",
+    "theme": "Mist and atmosphere",
+    "file": "5d9b67b8.webp",
+    "thumb": "thumbs/5d9b67b8.webp",
+    "width": 1600,
+    "height": 1200,
+    "credit": "Pavel Volkov",
+    "source": "https://commons.wikimedia.org/wiki/File:%D0%9A%D1%83%D1%82%D1%83%D0%B7%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F,_%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0,_%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D1%8F_(Unsplash).jpg",
+    "licence": "CC0"
   }
 ]

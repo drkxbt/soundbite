@@ -12,9 +12,9 @@ Hosted audiogram apps upload the recording, then charge a monthly plan for autom
 - **Captions without typing.** Whisper (tiny, multilingual) runs in a worker through transformers.js. The encoder runs on WebGPU and the decoder on WebAssembly when there is a GPU, and everything runs on WebAssembly when there isn't. The recording is transcribed two minutes at a time, the part you selected first; each two minutes takes about 10 to 45 seconds on a laptop. Every word keeps its own time, so the captions light up as each word is said.
 - **Several moments, several recordings, one clip.** Split cuts the clip in two at the playhead so each half can be trimmed on its own, and Add recording brings in another file from your computer after what is in the clip, captioned as soon as it opens. The parts play back to back, in an order you can drag; they are captioned before the rest, and a join between two cuts fades so a cut mid-word doesn't click.
 - **Fix anything.** The captions land in Audiogram's editor, where any line can be retyped or retimed by tapping along. Silence is caught before Whisper runs, and the stock phrases Whisper writes over noise, in any language, count as no speech, so your captions stay as they were.
-- **Design every frame.** A recording brings only its sound; the picture starts as a white page, or as one of twenty classic podcast designs, gilded, letterpressed and Art Deco, each laid out for every shape and each keeping its own background.
+- **Design every frame.** A recording brings only its sound; the picture starts as a white page, or as one of sixteen modern podcast designs, frosted glass over single-tone photos with a ring of dots or a dot-matrix clock, each laid out for every shape and each keeping its own background.
   - Elements has a section for each kind of part, painted in your design's colours: captions and sound, shapes, lines and curves, photo frames and grids, free photos, moving backgrounds, charts, tables, device mockups and 3D shapes, with a search and the ones you used last first.
-  - Add headings and pairs of fonts, forty free photos, and your own photos and videos; drop a photo on a frame to fill it.
+  - Add headings and pairs of fonts, forty-eight free photos, and your own photos and videos; drop a photo on a frame to fill it.
   - Colour anything from a picker with the colours already in your design, a set of defaults, gold, rose gold, silver, bronze and champagne finishes, gradients for the page, and any shade at all.
   - Start over clears the design in one step, and Undo brings it back.
   - Pick several things at once, group them, align and spread them; right-click for a menu.
@@ -55,20 +55,24 @@ Then open http://localhost:4340/demo/.
     x: "drkxbt",                              // the account the after-download card asks people to follow
     repo: "https://github.com/drkxbt/soundbite",
     media: "",                                // your stock search endpoint, or empty for no stock media
+    klipy: "",                                // an address that answers { key } for KLIPY, or empty for no KLIPY
   });
 </script>
 ```
 
 Give the container a height; the editor fills it. `soundbite()` returns `{ editor, destroy() }`, where `editor` is the Audiogram editor.
 
-`media` turns on the stock photos, illustrations, graphics, videos, stickers and GIFs in the Elements panel. Soundbite asks it `GET <media>?source=pixabay|pexels|giphy&kind=photo|illustration|vector|video|sticker|gif&q=<words>&page=<n>` and expects `{ items: [{ id, kind, name, thumb, file, width, height, credit?: { name, url }, link }], more }`. The endpoint keeps the libraries' API keys on your server. Asked with no parameters, it can answer `{ sources: ["pixabay", "giphy"] }` to name the libraries it has keys for, and only those are asked; without that list every library is asked, and one that answers with an error is left out of the panel.
+`media` turns on the stock photos, illustrations, graphics, videos, stickers and GIFs in the Elements panel. Soundbite asks it `GET <media>?source=pixabay|pexels|noto|giphy&kind=photo|illustration|vector|video|sticker|gif&q=<words>&page=<n>` and expects `{ items: [{ id, kind, name, thumb, file, width, height, credit?: { name, url }, link }], more }`. The endpoint keeps the libraries' API keys on your server. Asked with no parameters, it can answer `{ sources: ["pixabay", "noto", "giphy"] }` to name the libraries it has keys for, and only those are asked; without that list every library is asked, and one that answers with an error is left out of the panel.
+
+`klipy` turns on KLIPY's stickers and GIFs, which lead the Stickers and GIFs sections. Soundbite asks it `GET <klipy>` and expects `{ key }`, a KLIPY app key; any other answer leaves KLIPY out. KLIPY's terms have the visitor's browser make every search and load every file from the address KLIPY returns, with no server or proxy in between, so the key is in the page; KLIPY's app keys are public for that reason. Results show in KLIPY's order, in a grid of their own, and the search box reads "Search KLIPY" while they fill the panel, the attribution KLIPY requires. No visitor identifier is sent. Filter what KLIPY returns in its Partner Panel.
 
 A page with a Content Security Policy needs these sources:
 - `script-src 'self' 'wasm-unsafe-eval'` for the speech model's runtime;
 - `worker-src 'self'`;
 - `connect-src 'self' https://huggingface.co https://*.hf.co` for the model files;
 - `media-src 'self' blob:` and `img-src 'self' blob: data:` for the recording and pictures;
-- with `media` set, the stock libraries' image hosts in `img-src` and the hosts its files download from in `connect-src`.
+- with `media` set, the stock libraries' image hosts in `img-src` and the hosts its files download from in `connect-src`;
+- with `klipy` set, `https://static.klipy.com https://static1.klipy.com https://static2.klipy.com` in `img-src`, and those and `https://api.klipy.com` in `connect-src`.
 
 An ad unit also needs Google Publisher Tag's hosts. Nothing writes a `style` attribute, so `style-src 'self'` holds.
 

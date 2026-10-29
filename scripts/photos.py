@@ -1,13 +1,15 @@
-"""Builds the photo library: public-domain (CC0) photos for clip backgrounds, five for each theme, served from the
-app's own folder so the editor never loads a picture from another host.
+"""Builds the photo library: public-domain (CC0) photos for clip backgrounds, five for each theme and eight of mist
+and atmosphere, served from the app's own folder so the editor never loads a picture from another host.
 
-Run from anywhere with `python scripts/photos.py`. It searches an open index of CC0 images, downloads the picks,
-writes photos/<id>.webp, photos/thumbs/<id>.webp, photos/photos.json and photos/CREDITS.md, and drops photos an
-earlier run wrote that are no longer picked. Search results and downloads are cached in the system's temp folder,
-so a rerun after adding an id to EXCLUDED or a name to NAMES is quick and asks the index for nothing new.
+Run from anywhere with `python scripts/photos.py`. It searches an open index of CC0 images (and, for a theme in
+COMMONS_THEMES, the wiki's own media library), downloads the picks, writes photos/<id>.webp, photos/thumbs/<id>.webp,
+photos/photos.json and photos/CREDITS.md, and drops photos an earlier run wrote that are no longer picked. Search
+results and downloads are cached in the system's temp folder, so a rerun after adding an id to EXCLUDED or a name to
+NAMES is quick and asks the index for nothing new.
 """
 
 import hashlib
+import html
 import io
 import json
 import re
@@ -32,8 +34,18 @@ AGENT = "soundbite-photos/1.0 (+https://drk.vc/soundbite)"
 # mixes in paintings, diagrams and scans. Each is searched on its own, as the directory's few matches are otherwise
 # crowded out. The stock photo site is left out: the index links to its 960 px previews, too small to fill 1600 px.
 SOURCES = ("wordpress", "wikimedia")
+# Themes searched on the wiki's own API instead of through the index, for files its structured data marks CC0. The mist
+# theme was added while the index's search was down; it stays here because the two rank differently, so a rerun
+# through the index would swap the photos the designs use for others.
+COMMONS_THEMES = {"Mist and atmosphere"}
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+# P275 is a file's copyright licence on the wiki, and Q6938433 is CC0.
+COMMONS_CC0 = "haswbstatement:P275=Q6938433"
 
 PER_THEME = 5
+# Themes with more than PER_THEME photos. The designs that set a glass card over a toned photo all draw on the mist
+# theme, so it gets enough for each of them to have its own.
+LARGER_THEMES = {"Mist and atmosphere": 8}
 MIN_WIDTH = 1600
 # Landscape, but not so wide that a 16:9 or square clip crops away most of it.
 WIDEST, NARROWEST = 2.0, 1.25
@@ -52,6 +64,11 @@ THEMES = {
     "Desk and workspace": ["desk", "laptop", "workspace"],
     "Coffee and cosy": ["coffee cup", "coffee", "candle"],
     "Sky and sunset": ["sunset", "clouds sky", "sunrise"],
+    # Quiet, single-subject backdrops that take a one-colour filter well and leave room for a card over them.
+    "Mist and atmosphere": [
+        "fog", "lake mist", "tree in fog", "sand dunes sunset", "pale horizon", "rain on window", "mountains in clouds",
+        "night city bokeh",
+    ],
 }
 
 # Words that say a person is the subject. Titles and tags people gave are trusted; tags a machine guessed only
@@ -126,6 +143,11 @@ NAMES: dict[str, str] = {
     "00541370": "Tree against a pink evening sky",
     "f3f7cb43": "Prayer flags at sunrise",
     "79f1d53f": "Orange sunset over the sea",
+    "fba5d317": "Wooden jetty in thick fog",
+    "4a139be3": "Morning mist on a lake",
+    "ff81826c": "Lone tree in a foggy meadow",
+    "3b47c880": "Pale sand dunes before sunset",
+    "5d9b67b8": "City towers at night, out of focus",
 }
 
 
@@ -165,6 +187,8 @@ def cached(kind: str, key: str, load) -> bytes:
 
 
 def search(query: str, source: str, page: int) -> list[dict]:
+    if source == "commons":
+        return search_commons(query, page)
     params = {
         "q": query,
         "license": "cc0",
@@ -181,6 +205,81 @@ def search(query: str, source: str, page: int) -> list[dict]:
     except urllib.error.HTTPError as error:
         log(f"  search '{query}' in {source}, page {page}, failed: {error.code}")
         return []
+
+
+class SearchError(Exception):
+    """A search the wiki answered with an error each time it was asked."""
+
+
+def commons_answer(url: str, attempts: int = 5) -> bytes:
+    """The wiki's answer at url. A busy search comes back as an error inside an ordinary response, so it is asked
+    again after a growing wait, and an error is never returned, where it would be cached as a search that found
+    nothing."""
+    for attempt in range(attempts):
+        body = fetch(url)
+        error = json.loads(body).get("error")
+        if not error:
+            return body
+        if attempt == attempts - 1:
+            raise SearchError(error.get("code", "error"))
+        wait = 2 ** (attempt + 1)
+        log(f"  {error.get('code')}, retrying in {wait}s: {url[:90]}")
+        time.sleep(wait)
+    raise RuntimeError("unreachable")
+
+
+def search_commons(query: str, page: int) -> list[dict]:
+    """The wiki's own search for CC0 pictures, each shaped like one of the index's results: the file's hash as its id,
+    and its visible categories as tags a person gave it."""
+    params = {
+        "action": "query",
+        "format": "json",
+        "formatversion": 2,
+        "generator": "search",
+        "gsrsearch": f"{query} filetype:bitmap {COMMONS_CC0}",
+        "gsrnamespace": 6,
+        "gsrlimit": 20,
+        "gsroffset": (page - 1) * 20,
+        "prop": "imageinfo|categories",
+        "iiprop": "url|size|mime|sha1|extmetadata",
+        "iiextmetadatafilter": "LicenseShortName|Artist",
+        "clshow": "!hidden",
+        "cllimit": "max",
+    }
+    url = f"{COMMONS_API}?{urllib.parse.urlencode(params)}"
+    try:
+        pages = json.loads(cached("search", url, lambda: commons_answer(url))).get("query", {}).get("pages", [])
+    except (urllib.error.HTTPError, SearchError) as error:
+        log(f"  search '{query}' in commons, page {page}, failed: {error}")
+        return []
+    results = []
+    for found in sorted(pages, key=lambda found: found["index"]):
+        info = (found.get("imageinfo") or [{}])[0]
+        meta = info.get("extmetadata") or {}
+        licence = (meta.get("LicenseShortName") or {}).get("value", "")
+        artist = (meta.get("Artist") or {}).get("value", "")
+        # Photos brought over from a stock site credit "Name <a href=profile>handle</a>"; the handle repeats the name.
+        artist = re.sub(r"^([^<]+?)\s*<a [^>]*>[^<]*</a>\s*$", r"\1", artist)
+        artist = re.sub(r"<[^>]+>", "", artist)
+        results.append({
+            "id": info.get("sha1", ""),
+            "title": found["title"],
+            "tags": [{"name": category["title"].removeprefix("Category:")} for category in found.get("categories", [])],
+            "license": "cc0" if licence.upper().startswith("CC0") else licence.lower(),
+            "filetype": "jpg" if info.get("mime") == "image/jpeg" else "",
+            "width": info.get("width"),
+            "height": info.get("height"),
+            "creator": html.unescape(artist),
+            # The API tags its links with tracking parameters, which would hide a file's name from download_url.
+            "url": info.get("url", "").split("?")[0],
+            "foreign_landing_url": info.get("descriptionurl", "").split("?")[0],
+            "source": "commons",
+        })
+    return results
+
+
+def sources_of(theme: str) -> tuple[str, ...]:
+    return ("commons",) if theme in COMMONS_THEMES else SOURCES
 
 
 def shows_people(result: dict) -> bool:
@@ -274,13 +373,13 @@ def open_picture(result: dict) -> Image.Image | None:
     return image
 
 
-def candidates(queries: list[str]):
+def candidates(queries: list[str], sources: tuple[str, ...]):
     """Results for a theme, the searches taking turns, best first within each; a second page only when the first
     pages run out."""
     seen = set()
     for page in (1, 2):
         lists = [
-            [result for source in SOURCES for result in search(query, source, page) if suitable(result)]
+            [result for source in sources for result in search(query, source, page) if suitable(result)]
             for query in queries
         ]
         for turn in range(max(map(len, lists), default=0)):
@@ -294,7 +393,8 @@ def pick_theme(theme: str, queries: list[str], taken: set[str]) -> list[dict]:
     log(theme)
     # One photo a photographer in each theme, so a theme is not five frames from one shoot.
     picks, creators = [], set()
-    for result in candidates(queries):
+    wanted = LARGER_THEMES.get(theme, PER_THEME)
+    for result in candidates(queries, sources_of(theme)):
         short = result["id"][:8]
         who = credit(result)
         if short in taken or short in EXCLUDED or who in creators:
@@ -321,7 +421,7 @@ def pick_theme(theme: str, queries: list[str], taken: set[str]) -> list[dict]:
             "licence": "CC0",
         })
         log(f"  {short} {result['source']:<9} {len(full) // 1024:>4} KB  {picks[-1]['name']}")
-        if len(picks) == PER_THEME:
+        if len(picks) == wanted:
             return picks
     raise SystemExit(f"Only {len(picks)} photos found for {theme}; add searches to its list.")
 
@@ -350,7 +450,9 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     (OUT / "thumbs").mkdir(parents=True, exist_ok=True)
     # Each search can take most of a minute, so the first pages are asked for a few at a time up front.
-    searches = [(query, source) for queries in THEMES.values() for query in queries for source in SOURCES]
+    searches = [
+        (query, source) for theme, queries in THEMES.items() for query in queries for source in sources_of(theme)
+    ]
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda each: search(*each, 1), searches))
     taken: set[str] = set()

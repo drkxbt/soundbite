@@ -31,7 +31,8 @@ const DEVICES = ["phone", "tablet", "laptop", "monitor", "tv", "browser", "polar
 const SOLIDS = ["sphere", "cube", "cylinder", "cone", "torus", "pyramid", "capsule"];
 const AMBIENTS = ["aurora", "flow", "bokeh", "particles", "waves", "rays", "grid", "grain"];
 const TEXT_EFFECTS = ["lift", "hollow", "splice", "echo", "glitch", "neon"];
-const FILTERS = ["vivid", "warm", "cool", "fade", "retro", "dramatic", "mono", "noir"];
+const FILTERS = ["vivid", "warm", "cool", "fade", "retro", "dramatic", "mono", "noir", "amber", "slate", "ash"];
+const CLOCKS = ["both", "elapsed", "remaining", "percent"];
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 const THEME_PAINTS = ["text", "muted", "accent", "onAccent", "background"];
 // Named finishes the painter draws as gradients of its own; only these names, never a CSS value.
@@ -69,7 +70,7 @@ function parseArt(value: unknown): Art | null {
   }
   return paths.length ? { w: v.w, h: v.h, paths } : null;
 }
-const VISUALS: Visual[] = ["bars", "wave", "pulse"];
+const VISUALS: Visual[] = ["bars", "wave", "pulse", "ring"];
 
 /** A colour from storage when it is a hex colour, one of the theme's names or a metal; otherwise nothing. */
 function paintIn(value: unknown): string | undefined {
@@ -133,6 +134,7 @@ function parseLayer(value: unknown): Layer | null {
   put("ambient", AMBIENTS.includes(v.ambient as string) ? v.ambient : undefined);
   put("rules", ["none", "rows", "grid"].includes(v.rules as string) ? v.rules : undefined);
   put("cap", v.cap === "round" ? "round" : undefined);
+  put("clock", CLOCKS.includes(v.clock as string) ? v.clock : undefined);
   put("prefix", text("prefix", 8));
   put("suffix", text("suffix", 8));
   // A chart's rows: up to twelve, each a short label and a finite value, with a colour of its own if it is sound.
@@ -165,6 +167,8 @@ function parseLayer(value: unknown): Layer | null {
   ranged("pace", 0.25, 3);
   ranged("bend", -100, 100);
   ranged("max", -1e9, 1e9);
+  // Frosted glass: the blur, in pixels of a 1080 frame, behind a shape.
+  ranged("frost", 0, 60);
   if (v.crop && typeof v.crop === "object" && !Array.isArray(v.crop)) {
     const crop = v.crop as Record<string, unknown>;
     const finite = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
