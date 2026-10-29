@@ -1,4 +1,4 @@
-import { audiogram, type Editor, type Settings, type StockPhoto } from "@drkxbt/audiogram";
+import { audiogram, type Drawing, type Editor, type Settings, type StockPhoto } from "@drkxbt/audiogram";
 import { isSilent, SPEECH_RATE } from "./audio.js";
 import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
@@ -24,6 +24,8 @@ const ICONS = {
   credit: '<path d="M4 5.5h16v13H4z"/><path d="M13 8.5h4.5M15.5 8.5v.01"/><path d="m8 15 2.5-2.5L13 15"/>',
 };
 
+// The drawing sets the build writes to drawings/, in the order Elements shows them.
+const DRAWING_SETS = [["emoji", "Emoji"], ["icons", "Icons"], ["logos", "Social logos"]] as const;
 // The recording is transcribed this many seconds at a time, each read with a second of sound either side so no word
 // is cut at the join.
 const STRETCH = 120;
@@ -208,10 +210,14 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     void keep(editor.settings);
   });
   // The free photos, bundled next to the app, read once the page has settled so they never hold up the editor.
-  // With them, the stock sources the hosting page searches for us, the ones that answer, and the brand logos, which
-  // are read only when their section is first shown.
+  // With them, the stock sources the hosting page searches for us, the ones that answer, and the bundled emoji, icons
+  // and brand logos, each read only when its section is first shown.
   const photosAt = new URL("./photos/", import.meta.url);
-  const logosAt = new URL("./logos/", import.meta.url);
+  const drawingsAt = new URL("./drawings/", import.meta.url);
+  const readDrawings = (file: string) => fetch(new URL(file, drawingsAt)).then((response) => {
+    if (!response.ok) throw new Error(String(response.status));
+    return response.json() as Promise<Drawing[]>;
+  });
   setTimeout(() => {
     void Promise.all([
       fetch(new URL("photos.json", photosAt))
@@ -221,10 +227,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     ]).then(([photos, media]) => editor.setLibrary({
       photos: photos.map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
       media,
-      logos: () => fetch(new URL("logos.json", logosAt)).then((response) => {
-        if (!response.ok) throw new Error(String(response.status));
-        return response.json();
-      }),
+      drawings: DRAWING_SETS.map(([id, name]) => ({ id, name, first: () => readDrawings(`${id}.first.json`), all: () => readDrawings(`${id}.json`) })),
     }));
   }, 800);
   editor.slots.actions.append(creditWrap);

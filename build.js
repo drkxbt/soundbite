@@ -2,7 +2,7 @@
 import { build } from "esbuild";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { writeLogos } from "./scripts/logos.js";
+import { writeDrawings } from "./scripts/drawings.js";
 
 const out = "dist/app";
 await build({
@@ -59,7 +59,19 @@ await writeFile(`${out}/fonts/fonts.json`, JSON.stringify(fonts));
 await rm(`${out}/photos`, { recursive: true, force: true });
 await cp("photos", `${out}/photos`, { recursive: true });
 
-// The brand logos for the Elements panel, from the simple-icons package. A featured platform the package has dropped
-// is only worth a line, so a newer release never stops the build.
-const logos = await writeLogos(`${out}/logos`);
-if (logos.skipped.length) console.log(`logos: ${logos.count} written; not in simple-icons: ${logos.skipped.join(", ")}`);
+// The emoji, icons and brand logos for the Elements panel, from the packages that ship them. A drawing the converter
+// can't draw, or a featured one a newer release has dropped, is only worth a mention, so it never stops the build.
+const { sets } = await writeDrawings(`${out}/drawings`);
+const listed = (entries) => entries.map(([name, value]) => `${name} ${value}`).join(", ");
+const counts = Object.entries(sets).map(([id, set]) => [id, set.count]);
+const dropped = Object.entries(sets)
+  .filter(([, set]) => Object.keys(set.dropped).length)
+  .map(([id, set]) => [id, `${Object.values(set.dropped).reduce((sum, n) => sum + n, 0)} (${listed(Object.entries(set.dropped))})`]);
+const missing = Object.entries(sets)
+  .filter(([, set]) => set.skipped.length)
+  .map(([id, set]) => [id, set.skipped.join(", ")]);
+console.log(
+  [`drawings: ${listed(counts)}`, dropped.length && `dropped ${listed(dropped)}`, missing.length && `featured but missing: ${listed(missing)}`]
+    .filter(Boolean)
+    .join("; "),
+);

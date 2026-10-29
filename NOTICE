@@ -21,9 +21,11 @@ Stock photos, illustrations, videos, stickers and GIFs, when the hosting page of
 Pixabay, Pexels and GIPHY under each library's own licence; the panel credits the library and the author of each one.
 None of them is bundled with this repository.
 
-The brand logos in the Elements panel come from Simple Icons (simpleicons.org) under CC0 1.0, written to
-dist/app/logos/ with their licence note at build time. Each mark belongs to its owner and is offered only so a clip
-can say where to find the show; none of those companies has any connection with this project.
+The drawings in the Elements panel are written to dist/app/drawings/ at build time, with a licence file covering all
+three sets. The brand logos come from Simple Icons (simpleicons.org) under CC0 1.0; each mark belongs to its owner and
+is offered only so a clip can say where to find the show, and none of those companies has any connection with this
+project. The icons are Phosphor Icons (phosphoricons.com, MIT) and the emoji are Microsoft's Fluent Emoji in the flat
+style (github.com/microsoft/fluentui-emoji, MIT).
 
 X is named only to say what the clips are for; X Corp. has no connection with this project. Google Ad Manager serves
 the optional rewarded ad on drk.vc's copy; Google has no connection with this project either.

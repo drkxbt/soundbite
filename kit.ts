@@ -63,6 +63,8 @@ function parseArt(value: unknown): Art | null {
     if (typeof part.stroke === "string" && ART_PAINT.test(part.stroke)) path.stroke = part.stroke;
     if (typeof part.width === "number" && part.width > 0 && part.width <= 100) path.width = part.width;
     if (part.rule === "evenodd") path.rule = "evenodd";
+    // A two-tone icon's background and an emoji's highlights are faded parts of the drawing.
+    if (typeof part.opacity === "number" && part.opacity >= 0 && part.opacity < 1) path.opacity = part.opacity;
     paths.push(path);
   }
   return paths.length ? { w: v.w, h: v.h, paths } : null;

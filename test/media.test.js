@@ -44,7 +44,7 @@ test("a source with no key yet is left out, and an answering one isn't asked for
   };
   const live = await liveFeeds(mediaFeeds("/api/media", "https://drk.vc/"));
   assert.ok(live.every((feed) => feed.source !== "pexels"));
-  assert.equal(live.length, 5, "pixabay's three and giphy's two");
+  assert.equal(live.length, 6, "pixabay's four and giphy's two");
   const before = calls;
   const first = await live[0].search("", 1);
   assert.equal(first.items.length, 1);

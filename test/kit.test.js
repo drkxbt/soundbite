@@ -184,3 +184,13 @@ test("a background kept as a data URL becomes a picture again, and anything else
   assert.equal(dataUrlBlob("data:text/html;base64,PHNjcmlwdD4="), null);
   assert.equal(dataUrlBlob("https://example.com/a.png"), null);
 });
+
+test("a drawing's faded parts keep their opacity when saved, and an opacity out of range is left off", () => {
+  const art = { w: 256, h: 256, paths: [{ d: "M0 0h256v256z", fill: "currentColor", opacity: 0.2 }, { d: "M8 8h16v16z", fill: "currentColor" }] };
+  const graphic = { id: "g", kind: "graphic", art, x: 0.1, y: 0.1, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
+  assert.deepEqual(parseKit(JSON.stringify({ layers: { square: [graphic] } })).layers.square[0].art, art);
+  for (const opacity of [-1, 2, "0.5", null]) {
+    const odd = { ...graphic, art: { ...art, paths: [{ ...art.paths[0], opacity }] } };
+    assert.equal(parseKit(JSON.stringify({ layers: { square: [odd] } })).layers.square[0].art.paths[0].opacity, undefined, String(opacity));
+  }
+});

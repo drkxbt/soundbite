@@ -43,7 +43,7 @@ Then open http://localhost:4340/demo/.
 
 ## Put it in a page
 
-`npm run build` writes `dist/app/`: `soundbite.js`, `transcribe-worker.js`, `soundbite.css` and the ONNX Runtime files in `ort/`. Keep them together.
+`npm run build` writes `dist/app/`: `soundbite.js`, `transcribe-worker.js`, `soundbite.css`, the ONNX Runtime files in `ort/`, and the editor's fonts, free photos and drawings (emoji, icons and brand logos) in `fonts/`, `photos/` and `drawings/`. Keep them together.
 
 ```html
 <link rel="stylesheet" href="soundbite.css">
@@ -61,7 +61,7 @@ Then open http://localhost:4340/demo/.
 
 Give the container a height; the editor fills it. `soundbite()` returns `{ editor, destroy() }`, where `editor` is the Audiogram editor.
 
-`media` turns on the stock photos, illustrations, videos, stickers and GIFs in the Elements panel. Soundbite asks it `GET <media>?source=pixabay|pexels|giphy&kind=photo|illustration|video|sticker|gif&q=<words>&page=<n>` and expects `{ items: [{ id, kind, name, thumb, file, width, height, credit?: { name, url }, link }], more }`. The endpoint keeps the libraries' API keys on your server. Asked with no parameters, it can answer `{ sources: ["pixabay", "giphy"] }` to name the libraries it has keys for, and only those are asked; without that list every library is asked, and one that answers with an error is left out of the panel.
+`media` turns on the stock photos, illustrations, graphics, videos, stickers and GIFs in the Elements panel. Soundbite asks it `GET <media>?source=pixabay|pexels|giphy&kind=photo|illustration|vector|video|sticker|gif&q=<words>&page=<n>` and expects `{ items: [{ id, kind, name, thumb, file, width, height, credit?: { name, url }, link }], more }`. The endpoint keeps the libraries' API keys on your server. Asked with no parameters, it can answer `{ sources: ["pixabay", "giphy"] }` to name the libraries it has keys for, and only those are asked; without that list every library is asked, and one that answers with an error is left out of the panel.
 
 A page with a Content Security Policy needs these sources:
 - `script-src 'self' 'wasm-unsafe-eval'` for the speech model's runtime;

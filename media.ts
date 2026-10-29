@@ -12,12 +12,12 @@ interface Source {
 }
 
 export const SOURCES: Source[] = [
-  { source: "pixabay", name: "Pixabay", url: "https://pixabay.com/", credit: "Photos and videos from Pixabay", kinds: ["photo", "illustration", "video"] },
+  { source: "pixabay", name: "Pixabay", url: "https://pixabay.com/", credit: "Photos and videos from Pixabay", kinds: ["photo", "illustration", "vector", "video"] },
   { source: "pexels", name: "Pexels", url: "https://www.pexels.com/", credit: "Photos and videos from Pexels", kinds: ["photo", "video"] },
   { source: "giphy", name: "GIPHY", url: "https://giphy.com/", credit: "Powered by GIPHY", kinds: ["sticker", "gif"] },
 ];
 
-const KINDS: MediaKind[] = ["photo", "illustration", "video", "sticker", "gif"];
+const KINDS: MediaKind[] = ["photo", "illustration", "vector", "video", "sticker", "gif"];
 
 /** An address from the endpoint, made whole against it; only http and https ones are kept. */
 function address(value: unknown, base: URL): string | null {
