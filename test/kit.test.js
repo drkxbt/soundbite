@@ -213,6 +213,17 @@ test("a background kept as a data URL becomes a picture again, and anything else
   assert.equal(dataUrlBlob("https://example.com/a.png"), null);
 });
 
+test("an SVG cover or background is kept as a drawing and read back as one", () => {
+  const svg = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"/>').toString("base64")}`;
+  const kit = parseKit(JSON.stringify({ cover: svg, background: svg }));
+  assert.equal(kit.cover, svg);
+  assert.equal(kit.background, svg);
+  const blob = dataUrlBlob(svg);
+  assert.equal(blob.type, "image/svg+xml");
+  assert.equal(blob.size, 59);
+  assert.equal(dataUrlBlob("data:image/svg+xml,%3Csvg%2F%3E").size, 6, "written out rather than in base64");
+});
+
 test("a drawing's faded parts keep their opacity when saved, and an opacity out of range is left off", () => {
   const art = { w: 256, h: 256, paths: [{ d: "M0 0h256v256z", fill: "currentColor", opacity: 0.2 }, { d: "M8 8h16v16z", fill: "currentColor" }] };
   const graphic = { id: "g", kind: "graphic", art, x: 0.1, y: 0.1, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
@@ -228,4 +239,14 @@ test("a moving effect laid over the design keeps its see-through ground when sav
   assert.equal(parseKit(JSON.stringify({ layers: { square: [effect] } })).layers.square[0].fill, "none");
   const text = { id: "t", kind: "text", text: "Hi", fill: "none", x: 0, y: 0, w: 0.5, h: 0.1, rotation: 0, opacity: 1 };
   assert.equal(parseKit(JSON.stringify({ layers: { square: [text] } })).layers.square[0].fill, undefined, "only an effect has no ground");
+});
+
+test("every sound style is kept, for the whole kit and for a sound layer", () => {
+  for (const visual of ["bars", "wave", "pulse", "ring", "radial", "mirror", "line", "dots", "blocks", "scope"]) {
+    const sound = { id: "s", kind: "visual", visual, x: 0.1, y: 0.5, w: 0.8, h: 0.2, rotation: 0, opacity: 1 };
+    const kit = parseKit(JSON.stringify({ visual, layers: { square: [sound] } }));
+    assert.equal(kit.visual, visual);
+    assert.equal(kit.layers.square[0].visual, visual);
+  }
+  assert.equal(parseKit(JSON.stringify({ visual: "spiral" })).visual, undefined);
 });

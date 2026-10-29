@@ -10,6 +10,8 @@ import { FEATURED, toArt, writeDrawings } from "../scripts/drawings.js";
 // kit.ts drops a saved path that fails these, so a drawing that failed them would vanish from a design on reload.
 const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]+$/;
 const SETS = ["emoji", "icons", "logos"];
+// The illustration sets: a few dozen drawings each, in their own colours.
+const ILLUSTRATIONS = ["people", "doodles"];
 
 let dir;
 let result;
@@ -18,7 +20,7 @@ const read = (file) => JSON.parse(readFileSync(join(dir, file), "utf8"));
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), "soundbite-drawings-"));
   result = await writeDrawings(dir);
-  for (const id of SETS) sets[id] = read(`${id}.json`);
+  for (const id of [...SETS, ...ILLUSTRATIONS]) sets[id] = read(`${id}.json`);
 });
 after(() => rm(dir, { recursive: true, force: true }));
 
@@ -97,6 +99,79 @@ test("emoji keep the default yellow and leave out every skin tone", () => {
 
 test("each set stays small enough to fetch when the panel needs it", () => {
   for (const id of SETS) assert.ok(result.sets[id].bytes.raw < 6_000_000, `${id}: ${result.sets[id].bytes.raw}`);
+  // The illustrations are big drawings, but there are few of them.
+  for (const id of ILLUSTRATIONS) assert.ok(result.sets[id].bytes.raw < 1_500_000, `${id}: ${result.sets[id].bytes.raw}`);
+});
+
+test("people and doodles hold drawings a saved design keeps, each with its own id, in the set's own colours", () => {
+  for (const id of ILLUSTRATIONS) {
+    const list = sets[id];
+    assert.ok(list.length >= 25, `${id}: ${list.length}`);
+    assert.equal(result.sets[id].count, list.length, id);
+    assert.equal(new Set(list.map((drawing) => drawing.id)).size, list.length, id);
+    for (const { id: key, name, tags, art } of list) {
+      assert.ok(name && tags.length, key);
+      assert.ok(art.w > 0 && art.h > 0, key);
+      assert.ok(art.paths.length > 0 && art.paths.length <= 64, key);
+      let total = 0;
+      for (const part of art.paths) {
+        assert.match(part.d, PATH, key);
+        assert.match(part.d, /^[Mm]/, key);
+        assert.ok(part.d.length <= 20000, key);
+        total += part.d.length;
+        // Literal colours, so a drawing looks as its artist drew it whatever colour the layer is given.
+        for (const paint of [part.fill, part.stroke].filter(Boolean)) assert.match(paint, /^#[0-9a-f]{6}$/, key);
+      }
+      assert.ok(total <= 60000, key);
+    }
+  }
+});
+
+test("people and doodles lead with their featured drawings, none missing, and the first files hold them", () => {
+  for (const id of ILLUSTRATIONS) {
+    assert.equal(FEATURED[id].length, 8, id);
+    assert.deepEqual(result.sets[id].skipped, [], id);
+    assert.deepEqual(sets[id].slice(0, 8).map((drawing) => drawing.id), FEATURED[id], id);
+    assert.deepEqual(read(`${id}.first.json`), sets[id].slice(0, 8), id);
+    const rest = sets[id].slice(8);
+    assert.deepEqual(rest.map((drawing) => drawing.name), rest.toSorted(byName).map((drawing) => drawing.name), id);
+  }
+});
+
+test("people are every Open Peeps head of hair as a bust and every face on a head, in black line on white", () => {
+  const people = sets.people;
+  const busts = people.filter((drawing) => drawing.id.startsWith("peep-"));
+  const faces = people.filter((drawing) => drawing.id.startsWith("face-"));
+  assert.equal(busts.length + faces.length, people.length);
+  assert.equal(busts.length, 48);
+  assert.equal(faces.length, 30);
+  assert.deepEqual(result.sets.people.dropped, {});
+  for (const drawing of busts) assert.deepEqual(drawing.tags, ["person", "bust", "peeps"], drawing.id);
+  for (const drawing of faces) assert.deepEqual(drawing.tags.slice(0, 3), ["face", "head", "peeps"], drawing.id);
+  for (const drawing of people) {
+    const fills = new Set(drawing.art.paths.map((part) => part.fill));
+    assert.ok(fills.has("#000000") && fills.has("#ffffff"), drawing.id);
+  }
+  const byId = new Map(people.map((drawing) => [drawing.id, drawing]));
+  assert.equal(byId.get("peep-bantu-knots")?.name, "Peep, bantu knots");
+  assert.equal(byId.get("face-loving-grin-1")?.name, "Face, loving grin 1");
+  assert.ok(byId.get("face-smile-big").tags.includes("happy"));
+  // A bust stands on its shoulders, so it is taller than a face, which is only a head.
+  assert.ok(byId.get("peep-afro").art.h > byId.get("face-smile").art.h * 1.5);
+});
+
+test("doodles keep Open Doodles' black ink and pink accent, named after their files", () => {
+  const doodles = sets.doodles;
+  for (const drawing of doodles) {
+    const fills = new Set(drawing.art.paths.map((part) => part.fill));
+    assert.deepEqual([...fills].toSorted(), ["#000000", "#ff5678"], drawing.id);
+    assert.equal(drawing.tags[0], "doodle", drawing.id);
+  }
+  const byId = new Map(doodles.map((drawing) => [drawing.id, drawing]));
+  assert.equal(byId.get("ice-cream")?.name, "Ice cream");
+  assert.ok(byId.get("dog-jump").tags.includes("dog"));
+  // Each is in the box its ink reaches, not the 1024 by 768 page it was drawn on.
+  for (const drawing of doodles) assert.ok(drawing.art.w * drawing.art.h < 1024 * 768, drawing.id);
 });
 
 test("the converter draws circles, rounded rects and inherited paint", () => {
@@ -148,6 +223,9 @@ test("the licence file names each set's source and terms", () => {
   for (const text of [
     "Simple Icons", "CC0 1.0", "simpleicons.org", "brand guidelines", "Phosphor", "Copyright (c) 2023 Phosphor Icons",
     "Fluent Emoji", "Copyright (c) Microsoft Corporation.", "Permission is hereby granted, free of charge",
+    "## People (people.json)", "Open Peeps by Pablo Stanley", "https://www.openpeeps.com", "@dicebear/open-peeps",
+    "## Doodles (doodles.json)", "Open Doodles by Pablo Stanley", "https://www.opendoodles.com", "react-open-doodles",
+    "https://creativecommons.org/publicdomain/zero/1.0/",
   ]) {
     assert.ok(licence.includes(text), text);
   }
@@ -180,4 +258,46 @@ test("opacity that a canvas would stack differently from SVG is refused rather t
   assert.equal(toArt('<g opacity=".5"><path fill="#000" d="M0 0h10v10z"/><path fill="#000" d="M5 5h10v10z"/></g>', 32, 32).reason, "opacity");
   assert.equal(toArt('<path fill="#000" stroke="#000" stroke-width="4" opacity=".5" d="M4 4h10v10z"/>', 32, 32).reason, "opacity");
   assert.equal(toArt('<g opacity=".5"><path fill="#000" d="M0 0h10v10z"/></g>', 32, 32).art.paths[0].opacity, 0.5);
+});
+
+// A grid of small squares as one path's subpaths, none touching another: 1,600 of them write out well past one path.
+const squares = (left, top, step, side) => {
+  const out = [];
+  for (let i = 0; i < 40; i++) {
+    for (let j = 0; j < 40; j++) out.push(`M${(left + i * step).toFixed(2)} ${(top + j * step).toFixed(2)}h${side}v${side}h-${side}z`);
+  }
+  return out.join("");
+};
+const subpaths = (d) => d.match(/[Mm]/g).length;
+
+test("a path too long for a saved design is shared out among a few that draw the same", () => {
+  const { art } = toArt(`<path d="${squares(0.13, 0.13, 0.5, 0.25)}"/>`, 32, 32);
+  assert.ok(art.paths.length > 1);
+  for (const part of art.paths) {
+    assert.ok(part.d.length <= 20000, String(part.d.length));
+    assert.equal(part.fill, "#000000");
+  }
+  assert.equal(art.paths.reduce((sum, part) => sum + subpaths(part.d), 0), 1600);
+  // Squares outside an L's arms stay apart from it, though its box covers them all.
+  const { art: beside } = toArt(`<path d="M0 0h1v30h30v1h-31z${squares(2.13, 0.13, 0.45, 0.2)}"/>`, 32, 32);
+  assert.ok(beside.paths.length > 1);
+  assert.equal(beside.paths.reduce((sum, part) => sum + subpaths(part.d), 0), 1601);
+});
+
+test("a long path whose parts meet stays whole, or is refused when it can't", () => {
+  // Inside a frame the squares are holes it cuts or shapes it covers, so they draw the same only in its path.
+  assert.equal(toArt(`<path fill-rule="evenodd" d="M-1 -1h40v40h-40z${squares(0.13, 0.13, 0.5, 0.25)}"/>`, 32, 32).reason, "size");
+  // One long zigzag is one subpath: a 1024 unit box can write it in whole units, a 32 unit box can't afford to.
+  const points = Array.from({ length: 3500 }, (_, i) => `${(i * 0.3).toFixed(1)} ${i % 2 ? 1.7 : 0}`);
+  const zigzag = `<path d="M${points.join(" ")}z"/>`;
+  const { art } = toArt(zigzag, 1100, 1100);
+  assert.equal(art.paths.length, 1);
+  assert.ok(art.paths[0].d.length <= 20000 && !art.paths[0].d.includes("."));
+  assert.equal(toArt(zigzag, 32, 32).reason, "size");
+});
+
+test("a big box writes tenths of a unit and a small one hundredths", () => {
+  const body = '<path d="M0.123 0.456h10.789v1z"/>';
+  assert.equal(toArt(body, 1024, 1024).art.paths[0].d, "M.1.5h10.8v1z");
+  assert.equal(toArt(body, 32, 32).art.paths[0].d, "M.12.46h10.79v1z");
 });

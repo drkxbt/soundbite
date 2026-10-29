@@ -21,7 +21,7 @@ export const SOURCES: Source[] = [
   { source: "giphy", name: "GIPHY", url: "https://giphy.com/", credit: "Powered by GIPHY", kinds: ["sticker", "gif"] },
 ];
 
-const KINDS: MediaKind[] = ["photo", "illustration", "vector", "video", "sticker", "gif"];
+const KINDS: MediaKind[] = ["photo", "illustration", "vector", "video", "sticker", "object3d", "gif"];
 
 /** An address from the endpoint, made whole against it; only http and https ones are kept. */
 function address(value: unknown, base: URL): string | null {

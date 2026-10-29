@@ -3,6 +3,7 @@ import { build } from "esbuild";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { writeDrawings } from "./scripts/drawings.js";
+import { writeObjects3d } from "./scripts/objects3d.js";
 
 const out = "dist/app";
 await build({
@@ -74,4 +75,11 @@ console.log(
   [`drawings: ${listed(counts)}`, dropped.length && `dropped ${listed(dropped)}`, missing.length && `featured but missing: ${listed(missing)}`]
     .filter(Boolean)
     .join("; "),
+);
+
+// The 3D icons for Elements, see-through WebP made from 3dicons' renders. Without the network on a first build some
+// can't be fetched; they are named here, and the section shows the rest.
+const objects = await writeObjects3d(`${out}/objects3d`);
+console.log(
+  `3D icons: ${objects.count}, ${(objects.bytes / 1024 / 1024).toFixed(1)} MB${objects.missing.length ? `; could not fetch ${objects.missing.join(", ")}` : ""}`,
 );

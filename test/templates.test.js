@@ -71,10 +71,10 @@ function middleOf(page) {
   return `#${[16, 8, 0].map((shift) => mix(shift).toString(16).padStart(2, "0")).join("")}`;
 }
 
-test("there are sixteen templates, each with its own id and a short name of one to three words", () => {
-  assert.equal(PODCAST_TEMPLATES.length, 16);
-  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.id)).size, 16);
-  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.name)).size, 16);
+test("there are twenty-four templates, each with its own id and a short name of one to three words", () => {
+  assert.equal(PODCAST_TEMPLATES.length, 24);
+  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.id)).size, 24);
+  assert.equal(new Set(PODCAST_TEMPLATES.map((choice) => choice.name)).size, 24);
   for (const { id, name } of PODCAST_TEMPLATES) {
     assert.match(id, /^[a-z]+(?:-[a-z]+)*$/, id);
     assert.match(name, /^[A-Z][a-z]+(?: (?:[A-Z][a-z]+|and|of)){0,2}$/, name);

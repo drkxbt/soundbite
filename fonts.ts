@@ -41,6 +41,11 @@ export const FONTS: FontSpec[] = [
   font("black-ops-one", "Black Ops One", "Display"),
   font("monoton", "Monoton", "Display"),
   font("press-start-2p", "Press Start 2P", "Display"),
+  // Round, bubbly faces for loud, playful titles. None has a variable release.
+  font("bagel-fat-one", "Bagel Fat One", "Display"),
+  font("titan-one", "Titan One", "Display"),
+  font("chango", "Chango", "Display"),
+  font("rubik-bubbles", "Rubik Bubbles", "Display"),
   font("playfair-display", "Playfair Display", "Serif", true),
   font("dm-serif-display", "DM Serif Display", "Serif"),
   font("abril-fatface", "Abril Fatface", "Serif"),

@@ -70,7 +70,7 @@ function parseArt(value: unknown): Art | null {
   }
   return paths.length ? { w: v.w, h: v.h, paths } : null;
 }
-const VISUALS: Visual[] = ["bars", "wave", "pulse", "ring"];
+const VISUALS: Visual[] = ["bars", "wave", "pulse", "ring", "radial", "mirror", "line", "dots", "blocks", "scope"];
 
 /** A colour from storage when it is a hex colour, one of the theme's names or a metal; otherwise nothing. */
 function paintIn(value: unknown): string | undefined {
@@ -276,14 +276,46 @@ export function dataUrlBlob(url: string): Blob | null {
   }
 }
 
-/** A picture cut to a centred square and shrunk to `size` pixels, as a JPEG data URL small enough to keep. */
+const SVG = "image/svg+xml";
+// A drawing this small is kept as it is: it stays sharp at any size and takes less room than a picture of it would.
+const SVG_KEPT = 64 * 1024;
+
+/** A picture ready to draw on a canvas. An SVG goes through an <img>, since createImageBitmap can't read one from a
+ *  Blob in every browser. */
+async function drawable(blob: Blob): Promise<{ image: CanvasImageSource; width: number; height: number; close(): void }> {
+  if (blob.type !== SVG) {
+    const bitmap = await createImageBitmap(blob);
+    return { image: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
+  }
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  image.src = url;
+  try {
+    await image.decode();
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+  return { image, width: image.naturalWidth, height: image.naturalHeight, close: () => URL.revokeObjectURL(url) };
+}
+
+const dataUrlOf = (blob: Blob) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result));
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(blob);
+});
+
+/** A picture cut to a centred square and shrunk to `size` pixels, as a JPEG data URL small enough to keep; a small SVG
+ *  is kept whole, as a drawing. */
 export async function shrinkCover(blob: Blob, size = 256): Promise<string> {
-  const image = await createImageBitmap(blob);
+  if (blob.type === SVG && blob.size <= SVG_KEPT) return dataUrlOf(blob);
+  const image = await drawable(blob);
   const side = Math.min(image.width, image.height);
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  canvas.getContext("2d")!.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
+  canvas.getContext("2d")!.drawImage(image.image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
   image.close();
   return canvas.toDataURL("image/jpeg", 0.86);
 }
@@ -293,12 +325,12 @@ export async function shrinkCover(blob: Blob, size = 256): Promise<string> {
  * where transparency has to survive.
  */
 export async function fitPicture(blob: Blob, size: number, type: "image/jpeg" | "image/png"): Promise<string> {
-  const image = await createImageBitmap(blob);
+  const image = await drawable(blob);
   const scale = Math.min(1, size / Math.max(image.width, image.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(image.width * scale));
   canvas.height = Math.max(1, Math.round(image.height * scale));
-  canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
+  canvas.getContext("2d")!.drawImage(image.image, 0, 0, canvas.width, canvas.height);
   image.close();
   return canvas.toDataURL(type, 0.82);
 }

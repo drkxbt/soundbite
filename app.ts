@@ -13,6 +13,7 @@ import { showThanks } from "./panel.js";
 import { PODCAST_TEMPLATES } from "./templates.js";
 import { liveFeeds, offeredFeeds, offeredKlipyFeeds } from "./media.js";
 import { keepable, loadPictures, savePictures } from "./pictures.js";
+import { objects3dFeed } from "./objects3d.js";
 import { Coverage, cutPoint, type Span } from "./sweep.js";
 import { createTranscriber, type Progress } from "./transcribe.js";
 
@@ -25,7 +26,9 @@ const ICONS = {
 };
 
 // The drawing sets the build writes to drawings/, in the order Elements shows them.
-const DRAWING_SETS = [["emoji", "Emoji"], ["icons", "Icons"], ["logos", "Social logos"]] as const;
+const DRAWING_SETS = [
+  ["emoji", "Emoji"], ["icons", "Icons"], ["people", "People"], ["doodles", "Doodles"], ["logos", "Social logos"],
+] as const;
 // The recording is transcribed this many seconds at a time, each read with a second of sound either side so no word
 // is cut at the join.
 const STRETCH = 120;
@@ -225,7 +228,9 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     let photos: StockPhoto[] = [];
     let klipy: MediaFeed[] = [];
     let stock: MediaFeed[] = [];
-    const hand = () => editor.setLibrary({ photos, media: [...klipy, ...stock], drawings });
+    // The 3D icons are bundled like the photos, so they are offered from the start, with no key.
+    const objects3d = [objects3dFeed(new URL("./objects3d/", import.meta.url))];
+    const hand = () => editor.setLibrary({ photos, media: [...klipy, ...stock, ...objects3d], drawings });
     void fetch(new URL("photos.json", photosAt))
       .then((response) => (response.ok ? (response.json() as Promise<PhotoEntry[]>) : []))
       .catch((): PhotoEntry[] => [])

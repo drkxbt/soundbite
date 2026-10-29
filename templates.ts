@@ -1,9 +1,10 @@
-/* Sixteen ready-made looks for podcast and live audio clips, in a quiet modern manner: a single-tone photo carrying the
-   mood, frosted glass floating over it, thin labels, a ring of dots or a dot-matrix clock for the time, a row of small
-   stats. Each is laid out for every frame shape the editor offers. A template is only layers, so once it is picked
+/* Twenty-four ready-made looks for podcast and live audio clips. Eight are bold, the way a show's cover art is made:
+   flat colour, big type, and shapes drawn in the frame. Sixteen are in a quiet modern manner: a single-tone photo
+   carrying the mood, frosted glass floating over it, thin labels, a ring of dots or a dot-matrix clock for the time, a
+   row of small stats. Each is laid out for every frame shape the editor offers. A template is only layers, so once it is picked
    every part of it can be moved, restyled or deleted, and the words on its labels are sample copy for the user to
    change. Free of the DOM, so it can be tested on its own. */
-import { FRAME_SIZES, type Adjust, type Clock, type Crop, type Layer, type LayerKind, type Layout, type Page, type Template } from "@drkxbt/audiogram";
+import { FRAME_SIZES, type Adjust, type Art, type Clock, type Crop, type Layer, type LayerKind, type Layout, type Page, type Template } from "@drkxbt/audiogram";
 import { GLYPHS, type GlyphName } from "./glyphs.js";
 
 /** A design the user can start a clip from, laid out for whichever frame shape they picked. */
@@ -1083,8 +1084,526 @@ const liveRoom = template("live-room", "Live Room", { color: "#2a1a10", to: "#0d
   card(f, "card", x, a.top + (a.h - h) / 2, w, inset, pane, blocks);
 });
 
+/* ---------------------------------------------------------------------------------------------------------------- */
+/* Bold cover-art looks: flat colour, big type and shapes drawn in the frame, the way a show's square artwork is made. */
+
+const ANTON = "Anton";
+const ARCHIVO_BLACK = "Archivo Black";
+const SYNE = "Syne Variable";
+const MONO = "Space Mono";
+const PACIFICO = "Pacifico";
+const FREDOKA = "Fredoka Variable";
+const LUCKIEST = "Luckiest Guy";
+const RIGHTEOUS = "Righteous";
+const RALEWAY = "Raleway Variable";
+const CAVEAT = "Caveat Variable";
+
+// The warm dark theme: on a deep red page its muted words still read, where Ink's grey would not.
+const EMBER = 4;
+
+/**
+ * Plain words on one line, their top at `y` and `x` the edge or middle they are set from. The box's width is a guess
+ * from `advance`, how wide a letter of the face runs as a share of its size; right and centred words are drawn from the
+ * box's right edge or middle, so a wrong guess never moves them, and the editor fits the box once it is touched.
+ */
+function label(f: Frame, name: string, text: string, x: number, y: number, style: Style, advance = 0.62): number {
+  const size = style.size ?? 40;
+  const w = f.px(size * text.length * (advance + (style.letterSpacing ?? 0) / 1000));
+  const h = f.lines(size, 1, 1);
+  const align = style.align ?? "left";
+  f.add("text", name, align === "right" ? x - w : align === "center" ? x - w / 2 : x, y, w, h, { text, ...style, align, lineHeight: 1 });
+  return h;
+}
+
+/** A length in a drawing, to a tenth: fine enough for a 1080 frame and short enough for a saved kit to keep. */
+const tenth = (value: number) => Math.round(value * 10) / 10;
+
+/** Rows of small waves across a `w` by `h` box, the squiggles a screen print is patterned with. */
+function squiggles(w: number, h: number, rows: number, waves: number, width: number): Art {
+  const step = h / rows;
+  const half = (w - width * 2) / waves / 2;
+  const rise = Math.min(step * 0.32, half * 0.7);
+  let d = "";
+  for (let r = 0; r < rows; r++) d += `M${tenth(width)} ${tenth(step * (r + 0.5))}q${tenth(half / 2)} ${tenth(-rise)} ${tenth(half)} 0${`t${tenth(half)} 0`.repeat(waves * 2 - 1)}`;
+  return { w: tenth(w), h: tenth(h), paths: [{ d, stroke: "currentColor", width }] };
+}
+
+/** A grid of dots `gap` apart across a `w` by `h` box, like a halftone. */
+function dots(w: number, h: number, gap: number, r: number): Art {
+  let d = "";
+  for (let y = gap / 2; y < h; y += gap) {
+    for (let x = gap / 2; x < w; x += gap) d += `M${tenth(x - r)} ${tenth(y)}a${r} ${r} 0 1 0 ${r * 2} 0a${r} ${r} 0 1 0 ${-r * 2} 0`;
+  }
+  return { w: tenth(w), h: tenth(h), paths: [{ d, fill: "currentColor" }] };
+}
+
+/** Squares stepping in from the edges of a `w` by `h` frame, up to two deep along the top and foot and one at the
+ *  sides, with a fainter one at some tips, as a pixel dissolve leaves them. The same frame always gets the same steps. */
+function pixels(w: number, h: number, cell: number): Art {
+  const across = Math.round(w / cell);
+  const down = Math.round(h / cell);
+  const cw = w / across;
+  const ch = h / down;
+  const depth = (i: number, seed: number, most: number) => Math.max(0, Math.min(most, Math.round(0.9 + Math.sin(i * 1.3 + seed) * 0.8 + Math.sin(i * 0.37 + seed * 3) * 0.7)));
+  const square = (x: number, y: number) => `M${tenth(x)} ${tenth(y)}h${tenth(cw)}v${tenth(ch)}h${tenth(-cw)}z`;
+  let solid = "";
+  let faint = "";
+  for (let i = 0; i < across; i++) {
+    for (const [seed, from] of [[1, (j: number) => j * ch], [2, (j: number) => h - (j + 1) * ch]] as const) {
+      const k = depth(i, seed, 2);
+      for (let j = 0; j < k; j++) solid += square(i * cw, from(j));
+      if (k < 2 && (i * 7 + seed) % 3 === 0) faint += square(i * cw, from(k));
+    }
+  }
+  for (let i = 2; i < down - 2; i++) {
+    if (depth(i, 3, 1)) solid += square(0, i * ch);
+    if (depth(i, 4, 1)) solid += square(w - cw, i * ch);
+  }
+  return { w: tenth(w), h: tenth(h), paths: [{ d: solid, fill: "currentColor" }, { d: faint, fill: "currentColor", opacity: 0.5 }] };
+}
+
+/** The speaker's photo over a frame-wide row: their name and handle beside it, and the sound at the row's far end. */
+function signoff(f: Frame, c: Column, d: number, portrait: Portrait, name: Style, handle: Style, color: string, gap = 0): Block {
+  return byline(f, c, d, portrait, name, handle, gap, (y, h) => {
+    f.add("visual", "main", c.x + c.w - f.px(220), y + (h - f.px(44)) / 2, f.px(220), f.px(44), { visual: "bars", color });
+  });
+}
+
+/** A loud collage of flat shapes on pale peach: a cobalt blob, a red sun, a navy block printed with dots and a sky-blue
+ *  card printed with squiggles, overlapping, and the title in heavy white capitals on a dark band laid across them. */
+const colorCollage = template("color-collage", "Color Collage", { color: "#f6e5d9" }, PAPER, (f) => {
+  const ink = "#16161a";
+  const cobalt = "#2747d6";
+  const navy = "#1b2a78";
+  const title: Style = { font: ARCHIVO_BLACK, size: f.by({ square: 54, portrait: 60, story: 66, landscape: 64 }), weight: 400, color: WHITE, uppercase: true };
+  const words: Style = { font: ARCHIVO, size: f.by({ square: 50, portrait: 56, story: 62, landscape: 56 }), weight: 700, color: ink, highlight: cobalt, lineHeight: 1.24 };
+  const name: Style = { font: ARCHIVO, size: f.by({ square: 28, portrait: 29, story: 32, landscape: 30 }), weight: 700, color: ink };
+  const handle: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 500, color: ink, opacity: QUIET };
+  const tag: Style = { font: ARCHIVO_BLACK, size: f.by({ square: 26, portrait: 27, story: 30, landscape: 28 }), weight: 400, color: WHITE, background: ink, align: "right" };
+  const portrait: Portrait = { fill: cobalt, ink: WHITE };
+  const inset = f.px(f.by({ square: 26, portrait: 30, story: 34, landscape: 30 }));
+  const a = area(f);
+  const c = column(a.left, a.right);
+
+  /** The shapes, overlapping across the box they are given. */
+  const collage = (x: number, y: number, w: number, h: number) => {
+    f.add("shape", "blob", x + w * 0.02, y, w * 0.5, h * 0.72, { shape: "blob", fill: cobalt });
+    const sun = Math.min(w, h) * 0.62;
+    f.add("shape", "sun", x + w * 0.74 - sun / 2, y + h * 0.34 - sun / 2, sun, sun, { shape: "ellipse", fill: "#ef4130" });
+    const block = { x: x + w * 0.3, y: y + h * 0.52, w: w * 0.3, h: h * 0.42 };
+    f.add("shape", "block", block.x, block.y, block.w, block.h, { shape: "rect", fill: navy });
+    f.add("graphic", "dots", block.x, block.y, block.w, block.h, { art: dots(block.w, block.h, f.px(22), f.px(3.5)), color: "#8fb8ff" });
+    const card = { x: x + w * 0.6, y: y + h * 0.62, w: w * 0.32, h: h * 0.3 };
+    f.add("shape", "card", card.x, card.y, card.w, card.h, { shape: "rect", fill: "#a9d3f6", rotation: -12 });
+    f.add("graphic", "squiggle", card.x, card.y, card.w, card.h, { art: squiggles(card.w, card.h, 5, 5, f.px(7)), color: navy, rotation: -12 });
+  };
+  const bandHeight = (count: number) => f.lines(title.size!, count, 1.05) + f.px(2) + inset * 2;
+  /** The band across the whole frame, its top at `y`, with room in it for `count` lines of the title. */
+  const band = (y: number, count: number) => {
+    f.add("shape", "band", 0, y, f.width, bandHeight(count), { shape: "rect", fill: "#141a42", opacity: 0.94 });
+    f.add("title", "main", c.x, y + inset, c.w, bandHeight(count) - inset * 2, { align: "left", ...title, lineHeight: 1.05 });
+  };
+
+  if (f.wide) {
+    collage(a.left, a.top, f.px(860), a.h);
+    const y = (f.height - bandHeight(3)) / 2;
+    band(y, 3);
+    label(f, "ep", "Ep. 00", a.right, a.top, tag, 0.72);
+    const right = column(f.px(1020), a.right);
+    stack(a.top, y - f.px(36), [space(), signoff(f, right, 64, portrait, name, handle, cobalt)]);
+    stack(y + bandHeight(3) + f.px(36), a.bottom, [captions(f, right, words, 3), space()]);
+    return;
+  }
+  const zone = f.px(f.by({ square: 520, portrait: 720, story: 900, landscape: 0 }));
+  collage(a.left, a.top, a.w, zone);
+  // Capitals in Archivo Black run wide, so a long title gets a line more than its words would need in a narrower face.
+  const count = f.by({ square: 3, portrait: 4, story: 4, landscape: 0 });
+  band(a.top + zone * 0.5 - bandHeight(count) / 2, count);
+  label(f, "ep", "Ep. 00", a.right, a.top, tag, 0.72);
+  stack(a.top + zone + f.px(f.by({ square: 30, portrait: 40, story: 50, landscape: 0 })), a.bottom, [
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 4, landscape: 0 })),
+    space(),
+    signoff(f, c, f.by({ square: 60, portrait: 64, story: 72, landscape: 0 }), portrait, name, handle, cobalt),
+  ]);
+});
+
+/** The speaker's photo large on white, cut across by a band of electric blue carrying the show's name in lowercase
+ *  and the sound, thin blue stripes running in behind the photo. */
+const portraitBand = template("portrait-band", "Portrait Band", { color: "#ffffff" }, PAPER, (f) => {
+  const ink = "#111111";
+  const vivid = "#1f3bff";
+  const mark: Style = { font: SYNE, size: f.by({ square: 76, portrait: 84, story: 90, landscape: 92 }), weight: 800, color: WHITE, letterSpacing: -30 };
+  const title: Style = { font: SYNE, size: f.by({ square: 40, portrait: 44, story: 50, landscape: 46 }), weight: 700, color: ink, lineHeight: 1.12 };
+  const words: Style = { font: SYNE, size: f.by({ square: 48, portrait: 54, story: 62, landscape: 56 }), weight: 600, color: ink, highlight: vivid, lineHeight: 1.26 };
+  const kicker: Style = { font: SYNE, size: f.by({ square: 26, portrait: 27, story: 30, landscape: 28 }), weight: 700, color: vivid, uppercase: true, letterSpacing: 140 };
+  const name: Style = { font: SYNE, size: f.by({ square: 34, portrait: 36, story: 40, landscape: 38 }), weight: 700, color: ink };
+  const handle: Style = { font: SYNE, size: f.by({ square: 26, portrait: 27, story: 30, landscape: 28 }), weight: 500, color: ink, opacity: QUIET };
+  const a = area(f);
+
+  /** The episode over the speaker's name and handle. */
+  const who = (c: Column): Block => {
+    const kickH = f.lines(kicker.size!, 1, 1);
+    const between = f.px(16);
+    const nameH = f.lines(name.size!, 1, 1.25);
+    const handleH = f.lines(handle.size!, 1, 1.3);
+    return { h: kickH + between + nameH + handleH, gap: 0, draw: (y) => {
+      label(f, "ep", "Ep. 00", c.x, y, kicker, 0.7);
+      f.add("name", "main", c.x, y + kickH + between, c.w, nameH, { align: "left", ...name });
+      f.add("handle", "main", c.x, y + kickH + between + nameH, c.w, handleH, { align: "left", ...handle });
+    } };
+  };
+
+  const d = f.px(f.by({ square: 470, portrait: 600, story: 740, landscape: 820 }));
+  const x = f.wide ? a.left : f.width - d - f.px(36);
+  const y = f.wide ? (f.height - d) / 2 : a.top;
+  const bandH = f.px(f.by({ square: 150, portrait: 170, story: 190, landscape: 180 }));
+  const bandY = y + d * 0.6;
+  // Drawn before the photo, so they run in behind it; on a wide frame they stop at its middle, clear of the words.
+  const stripes = f.wide ? x + d / 2 : f.width;
+  for (const step of [1, 2, 3]) f.add("shape", `stripe-${step}`, 0, bandY - f.px(28 * step), stripes, f.px(12), { shape: "rect", fill: vivid });
+  f.add("avatar", "main", x, y, d, d, { fill: "#dfe4ff", color: vivid });
+  f.add("shape", "band", 0, bandY, f.width, bandH, { shape: "rect", fill: vivid });
+  label(f, "mark", "your show", f.wide ? f.px(960) : a.left, bandY + (bandH - f.lines(mark.size!, 1, 1)) / 2, mark, 0.56);
+  f.add("visual", "main", a.right - f.px(170), bandY + bandH * 0.3, f.px(170), bandH * 0.4, { visual: "bars", color: WHITE });
+
+  if (f.wide) {
+    const right = column(f.px(960), a.right);
+    stack(a.top, bandY - f.px(30), [who(right), space(), heading(f, right, title, 3)]);
+    stack(bandY + bandH + f.px(26), a.bottom, [captions(f, right, words, 2), space()]);
+    return;
+  }
+  stack(a.top, bandY - f.px(100), [who(column(a.left, x - f.px(30))), space()]);
+  const c = column(a.left, a.right);
+  stack(bandY + bandH + f.px(f.by({ square: 30, portrait: 40, story: 50, landscape: 0 })), a.bottom, [
+    heading(f, c, title, 2),
+    space(0.5),
+    captions(f, c, words, f.by({ square: 3, portrait: 3, story: 4, landscape: 0 })),
+    space(),
+  ]);
+});
+
+/** A soft wash of pastels framed by white squares stepping in from the edges, the title in clean centred capitals and
+ *  small spaced labels in the corners. */
+const pastelPixel = template("pastel-pixel", "Pastel Pixel", { color: "#f9d3e6", to: "#cfe5f8", angle: 135 }, PAPER, (f) => {
+  const ink = "#17171c";
+  const lilac = "#6a4cf0";
+  const title: Style = { font: GROTESK, size: f.by({ square: 60, portrait: 68, story: 76, landscape: 72 }), weight: 500, color: ink, uppercase: true, align: "center", letterSpacing: -20 };
+  const words: Style = { font: GROTESK, size: f.by({ square: 46, portrait: 50, story: 58, landscape: 54 }), weight: 500, color: ink, highlight: lilac, align: "center", lineHeight: 1.26 };
+  const corner: Style = { font: GROTESK, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 26 }), weight: 600, color: ink, uppercase: true, letterSpacing: 120 };
+  const portrait: Portrait = { fill: WHITE, ink: lilac };
+  const a = area(f);
+  const side = Math.min(f.width, f.height);
+
+  // Discs of colour under one sheet of frosted glass, which melts them into a wash; each kept inside the frame.
+  const washes: Array<[string, number, number, number]> = [
+    ["#ffb3d6", 0.24, 0.22, 0.62],
+    ["#fff0a0", 0.76, 0.26, 0.56],
+    ["#ffd0a6", 0.5, 0.5, 0.5],
+    ["#aef0d8", 0.26, 0.76, 0.6],
+    ["#c9b8ff", 0.76, 0.76, 0.6],
+  ];
+  washes.forEach(([color, cx, cy, size], index) => {
+    const d = side * size;
+    const x = Math.min(Math.max(0, f.width * cx - d / 2), f.width - d);
+    const y = Math.min(Math.max(0, f.height * cy - d / 2), f.height - d);
+    f.add("shape", `wash-${index + 1}`, x, y, d, d, { shape: "ellipse", fill: color });
+  });
+  f.add("shape", "haze", 0, 0, f.width, f.height, { shape: "rect", fill: WHITE, opacity: 0.16, frost: 60 });
+  const cell = f.px(50);
+  f.add("graphic", "pixels", 0, 0, f.width, f.height, { art: pixels(f.width, f.height, cell), color: WHITE });
+
+  // The labels sit just inside the deepest steps: two squares at the top and foot, one at the sides.
+  const lineH = f.lines(corner.size!, 1, 1);
+  const left = cell + f.px(44);
+  const right = f.width - left;
+  const top = Math.max(a.top, cell * 2 + f.px(34));
+  const foot = Math.min(a.bottom, f.height - cell * 2 - f.px(34)) - lineH;
+  label(f, "show", "Podcast", left, top, corner, 0.66);
+  label(f, "ep", "Ep. 00", right, top, { ...corner, align: "right" }, 0.66);
+  label(f, "by", "By", left, foot, corner, 0.66);
+  const by = f.px(corner.size! * 2 * 0.8 + 14);
+  const nameH = f.lines(corner.size!, 1, 1.3);
+  f.add("name", "main", left + by, foot - (nameH - lineH) / 2, f.width / 2 - left - by, nameH, { align: "left", ...corner });
+  const clockH = f.lines(corner.size!, 1, 1.3);
+  f.add("time", "main", right - f.px(260), foot - (clockH - lineH) / 2, f.px(260), clockH, { align: "right", clock: "remaining", ...corner });
+
+  const c = f.wide ? column(f.px(360), f.width - f.px(360)) : column(a.left + f.px(40), a.right - f.px(40));
+  const d = f.by({ square: 92, portrait: 104, story: 120, landscape: 96 });
+  stack(top + lineH + f.px(40), foot - f.px(40), [
+    space(),
+    row(f, d, 0, (y, h) => avatarAt(f, f.width / 2, y + h / 2, d, portrait)),
+    heading(f, c, title, f.by({ square: 3, portrait: 3, story: 4, landscape: 3 }), f.by({ square: 26, portrait: 34, story: 44, landscape: 28 })),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 3, landscape: 2 }), f.by({ square: 18, portrait: 26, story: 36, landscape: 20 })),
+    bars(f, f.width / 2 - f.px(110), f.px(220), f.by({ square: 40, portrait: 44, story: 50, landscape: 44 }), ink, f.by({ square: 16, portrait: 22, story: 30, landscape: 18 })),
+    space(),
+  ]);
+});
+
+/** Flat signal yellow and a red drawing of a microphone and headphones leaning in to each other, sparks flying, the
+ *  title typed in mono capitals on black label bars. */
+const signalYellow = template("signal-yellow", "Signal Yellow", { color: "#ffe500" }, PAPER, (f) => {
+  const ink = "#111111";
+  const red = "#d42020";
+  const title: Style = { font: MONO, size: f.by({ square: 42, portrait: 46, story: 52, landscape: 48 }), weight: 700, color: "#ffe500", background: ink, uppercase: true };
+  const words: Style = { font: MONO, size: f.by({ square: 46, portrait: 50, story: 56, landscape: 52 }), weight: 700, color: ink, highlight: red, lineHeight: 1.3 };
+  const name: Style = { font: MONO, size: f.by({ square: 28, portrait: 29, story: 32, landscape: 30 }), weight: 700, color: ink };
+  const handle: Style = { font: MONO, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 27 }), weight: 400, color: ink, opacity: QUIET };
+  const portrait: Portrait = { fill: red, ink: "#ffe500" };
+  const a = area(f);
+
+  /** The drawing, across the box it is given. */
+  const drawing = (x: number, y: number, w: number, h: number) => {
+    const size = Math.min(h * 0.9, w * 0.46) / f.unit;
+    const top = y + (h - f.px(size)) / 2;
+    icon(f, "microphone", "microphone", x + w * 0.27 - f.px(size) / 2, top, size, red, 1, { rotation: -14 });
+    icon(f, "headphones", "headphones", x + w * 0.72 - f.px(size * 0.9) / 2, top + f.px(size * 0.08), size * 0.9, red, 1, { rotation: 12 });
+    const sparks: Array<[number, number, number]> = [[0.5, 0.18, 0.16], [0.56, 0.36, 0.09], [0.45, 0.7, 0.11]];
+    sparks.forEach(([sx, sy, ss], index) => {
+      const s = f.px(size) * ss;
+      f.add("shape", `spark-${index + 1}`, x + w * sx - s / 2, y + h * sy - s / 2, s, s, { shape: "sparkle", fill: red });
+    });
+  };
+  /** The title on its bars; the bars reach past the words by a fifth of their size, so the words sit that far in. */
+  const titled = (c: Column, gap = 0) => heading(f, column(c.x + f.px(title.size! * 0.22), c.x + c.w - f.px(title.size! * 0.22)), { ...title, lineHeight: 1.42 }, 3, gap);
+
+  if (f.wide) {
+    drawing(a.left, a.top, f.px(800), a.h);
+    const right = column(f.px(960), a.right);
+    stack(a.top, a.bottom, [space(), titled(right), captions(f, right, words, 3, 34), space(), signoff(f, right, 64, portrait, name, handle, ink)]);
+    return;
+  }
+  const zone = f.px(f.by({ square: 360, portrait: 480, story: 620, landscape: 0 }));
+  drawing(a.left, a.top, a.w, zone);
+  const c = column(a.left, a.right);
+  stack(a.top + zone + f.px(f.by({ square: 28, portrait: 40, story: 50, landscape: 0 })), a.bottom, [
+    titled(c),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 4, landscape: 0 }), f.by({ square: 24, portrait: 34, story: 44, landscape: 0 })),
+    space(),
+    signoff(f, c, f.by({ square: 60, portrait: 64, story: 72, landscape: 0 }), portrait, name, handle, ink),
+  ]);
+});
+
+/** Deep red, a row of round cartoon faces with the speaker's photo among them, and the title in a big white script
+ *  under the show's name in spaced capitals. */
+const scriptRed = template("script-red", "Script Red", { color: "#b8141f", to: "#920d18", angle: 180 }, EMBER, (f) => {
+  const cream = "#fff3e2";
+  const yellow = "#ffd23f";
+  const dark = "#2a0a0c";
+  const title: Style = { font: PACIFICO, size: f.by({ square: 62, portrait: 72, story: 80, landscape: 74 }), weight: 400, color: WHITE, align: "center", lineHeight: 1.3 };
+  const kicker: Style = { font: ARCHIVO_BLACK, size: f.by({ square: 26, portrait: 28, story: 30, landscape: 28 }), weight: 400, color: cream, uppercase: true, letterSpacing: 260, align: "center" };
+  const words: Style = { font: FREDOKA, size: f.by({ square: 48, portrait: 54, story: 60, landscape: 56 }), weight: 600, color: cream, highlight: yellow, align: "center", lineHeight: 1.26 };
+  const name: Style = { font: FREDOKA, size: f.by({ square: 28, portrait: 30, story: 33, landscape: 31 }), weight: 600, color: cream, align: "center" };
+  const portrait: Portrait = { fill: "#ffd9b8", ink: "#b8141f", rim: cream };
+  const a = area(f);
+
+  /** A cartoon head: hair peeking over it, two dot eyes and a smile. */
+  const face = (n: number, cx: number, cy: number, d: number, skin: string, hair: string) => {
+    f.add("shape", `hair-${n}`, cx - d * 0.54, cy - d * 0.64, d * 1.08, d * 0.84, { shape: "ellipse", fill: hair });
+    f.add("shape", `face-${n}`, cx - d / 2, cy - d / 2, d, d, { shape: "ellipse", fill: skin });
+    const eye = d * 0.1;
+    for (const [side, dx] of [["left", -0.17], ["right", 0.17]] as const) {
+      f.add("shape", `eye-${n}-${side}`, cx + d * dx - eye / 2, cy - d * 0.06 - eye / 2, eye, eye, { shape: "ellipse", fill: dark });
+    }
+    f.add("shape", `smile-${n}`, cx - d * 0.18, cy + d * 0.12, d * 0.36, d * 0.14, { shape: "line", fill: dark, strokeWidth: round((d * 0.05) / f.unit), bend: -70, cap: "round" });
+  };
+  /** Four heads in a row about `cx`, the speaker's photo second. */
+  const faces = (cx: number, d: number, gap = 0): Block => row(f, d * 1.14, gap, (y, h) => {
+    const cy = y + h - f.px(d) / 2;
+    const step = f.px(d) * 1.3;
+    const at = (slot: number) => cx + (slot - 1.5) * step;
+    face(1, at(0), cy, f.px(d), "#ffe1c4", yellow);
+    avatarAt(f, at(1), cy, d, portrait);
+    face(2, at(2), cy, f.px(d), "#f2b48c", dark);
+    face(3, at(3), cy, f.px(d), "#ffd9b8", "#ff8fa3");
+  });
+  const named = (c: Column, gap = 0) => row(f, name.size! * 1.3, gap, (y, h) => f.add("name", "main", c.x, y, c.w, h, { ...name }));
+  const show = (cx: number, gap = 0) => row(f, kicker.size!, gap, (y) => label(f, "show", "Your show", cx, y, kicker, 0.78));
+
+  if (f.wide) {
+    const left = column(a.left, f.px(860));
+    const cx = left.x + left.w / 2;
+    stack(a.top, a.bottom, [space(), faces(cx, 140), named(left, 26), bars(f, cx - f.px(130), f.px(260), 52, cream, 40), space()]);
+    const right = column(f.px(940), a.right);
+    const mid = right.x + right.w / 2;
+    stack(a.top, a.bottom, [space(), show(mid), heading(f, right, title, 3, 20), captions(f, right, words, 2, 24), space()]);
+    return;
+  }
+  const c = column(a.left, a.right);
+  stack(a.top, a.bottom, [
+    faces(f.width / 2, f.by({ square: 136, portrait: 166, story: 188, landscape: 0 })),
+    named(c, f.by({ square: 14, portrait: 20, story: 26, landscape: 0 })),
+    space(0.6),
+    show(f.width / 2),
+    heading(f, c, title, 3, f.by({ square: 12, portrait: 18, story: 24, landscape: 0 })),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 4, landscape: 0 }), f.by({ square: 14, portrait: 22, story: 32, landscape: 0 })),
+    space(),
+    bars(f, f.width / 2 - f.px(120), f.px(240), f.by({ square: 40, portrait: 46, story: 52, landscape: 0 }), cream),
+  ]);
+});
+
+/** Neon green filled edge to edge by the title in huge condensed black capitals, stacked line on line, the show's
+ *  name running down the right edge like a book's spine. */
+const giantType = template("giant-type", "Giant Type", { color: "#3dff1f" }, PAPER, (f) => {
+  const ink = "#0b0b0b";
+  const title: Style = { font: ANTON, size: f.by({ square: 108, portrait: 126, story: 140, landscape: 136 }), weight: 400, color: ink, uppercase: true };
+  const words: Style = { font: ARCHIVO, size: f.by({ square: 48, portrait: 54, story: 60, landscape: 56 }), weight: 800, color: ink, highlight: ink, lineHeight: 1.22 };
+  const spine: Style = { font: ARCHIVO_BLACK, size: f.by({ square: 28, portrait: 30, story: 32, landscape: 30 }), weight: 400, color: ink, uppercase: true, letterSpacing: 160, align: "center" };
+  const name: Style = { font: ARCHIVO, size: f.by({ square: 28, portrait: 29, story: 32, landscape: 30 }), weight: 800, color: ink };
+  const handle: Style = { font: ARCHIVO, size: f.by({ square: 26, portrait: 27, story: 29, landscape: 28 }), weight: 500, color: ink, opacity: QUIET };
+  const portrait: Portrait = { fill: ink, ink: "#3dff1f" };
+  const a = area(f);
+
+  // Turned a quarter, so it reads down the edge; its box is laid flat, then turned about its middle.
+  const text = "Your show · Ep. 00";
+  const across = f.px(spine.size! * text.length * (0.74 + spine.letterSpacing! / 1000));
+  const thick = f.lines(spine.size!, 1, 1);
+  f.add("text", "spine", a.right - thick / 2 - across / 2, a.top + across / 2 - thick / 2, across, thick, { text, ...spine, lineHeight: 1, rotation: 90 });
+  const edge = a.right - thick - f.px(36);
+  const big = (c: Column, count: number): Block => heading(f, c, { ...title, lineHeight: 0.96 }, count);
+
+  if (f.wide) {
+    stack(a.top, a.bottom, [space(), big(column(a.left, f.px(1160)), 5), space()]);
+    const right = column(f.px(1240), edge);
+    stack(a.top, a.bottom, [space(), captions(f, right, words, 4), space(), signoff(f, right, 64, portrait, name, handle, ink)]);
+    return;
+  }
+  const c = column(a.left, edge);
+  stack(a.top, a.bottom, [
+    big(c, f.by({ square: 5, portrait: 5, story: 6, landscape: 0 })),
+    space(),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 4, landscape: 0 })),
+    space(0.5),
+    signoff(f, c, f.by({ square: 60, portrait: 64, story: 72, landscape: 0 }), portrait, name, handle, ink),
+  ]);
+});
+
+/** A retro space poster on deep navy: stars and ringed planets cut from flat colour, the speaker in a ring of dots like
+ *  a moon in orbit, the title in chunky yellow capitals with a stepped shadow, and a cream strip
+ *  along the foot with a tagline. */
+const retroPoster = template("retro-poster", "Retro Poster", { color: "#1b2150", to: "#0e1233", angle: 180 }, INK, (f) => {
+  const cream = "#f6e7c8";
+  const yellow = "#ffcf5a";
+  const orange = "#ff6b35";
+  const teal = "#3fc1c9";
+  const navy = "#141a40";
+  const title: Style = { font: LUCKIEST, size: f.by({ square: 62, portrait: 70, story: 78, landscape: 72 }), weight: 400, color: yellow, effect: "echo", align: "center", lineHeight: 1.1 };
+  const words: Style = { font: RIGHTEOUS, size: f.by({ square: 48, portrait: 54, story: 60, landscape: 56 }), weight: 400, color: cream, highlight: yellow, align: "center", lineHeight: 1.26 };
+  const name: Style = { font: RIGHTEOUS, size: f.by({ square: 30, portrait: 32, story: 35, landscape: 33 }), weight: 400, color: cream, align: "center" };
+  const tagline: Style = { font: RIGHTEOUS, size: f.by({ square: 26, portrait: 28, story: 30, landscape: 28 }), weight: 400, color: navy, uppercase: true, letterSpacing: 140, align: "center" };
+  const portrait: Portrait = { fill: orange, ink: navy };
+  const a = area(f);
+
+  // On a story the strip runs on to the frame's foot, its words kept above the band the apps cover.
+  const stripH = f.px(f.by({ square: 96, portrait: 104, story: 104, landscape: 96 }));
+  const stripTop = f.tall ? a.bottom - stripH : f.height - stripH;
+  const sky = stripTop - f.px(24);
+
+  const stars: Array<[number, number, number, "star" | "sparkle"]> = [
+    [0.07, 0.05, 30, "star"], [0.93, 0.08, 24, "sparkle"], [0.5, 0.03, 18, "sparkle"], [0.2, 0.3, 18, "sparkle"],
+    [0.85, 0.34, 30, "star"], [0.05, 0.52, 20, "sparkle"], [0.95, 0.57, 18, "sparkle"], [0.1, 0.8, 28, "star"],
+    [0.9, 0.86, 20, "sparkle"], [0.36, 0.95, 16, "sparkle"], [0.66, 0.93, 24, "star"],
+  ];
+  stars.forEach(([sx, sy, size, shape], index) => {
+    const s = f.px(size);
+    f.add("shape", `star-${index + 1}`, f.width * sx - s / 2, Math.max(0, sky * sy - s / 2), s, s, { shape, fill: index % 3 ? cream : yellow, opacity: 0.9 });
+  });
+  /** A planet of `d` across centred on a point, with a tilted ring round it when it has one. */
+  const planet = (n: number, cx: number, cy: number, d: number, fill: string, ring?: string) => {
+    f.add("shape", `planet-${n}`, cx - d / 2, cy - d / 2, d, d, { shape: "ellipse", fill });
+    if (ring) f.add("shape", `orbit-${n}`, cx - d * 0.9, cy - d * 0.25, d * 1.8, d * 0.5, { shape: "ring", fill: ring, rotation: -16 });
+  };
+  const orbit = (d: number, gap = 0) => ring(f, f.width / 2, d, cream, (cy) => avatarAt(f, f.width / 2, cy, d * 0.6, portrait), gap);
+  const named = (c: Column, gap = 0) => row(f, name.size! * 1.3, gap, (y, h) => f.add("name", "main", c.x, y, c.w, h, { ...name }));
+
+  f.add("shape", "strip", 0, stripTop, f.width, f.height - stripTop, { shape: "rect", fill: cream });
+  label(f, "tagline", "A tagline for your show", f.width / 2, stripTop + (stripH - f.lines(tagline.size!, 1, 1)) / 2, tagline, 0.62);
+
+  if (f.wide) {
+    planet(1, f.px(1780), f.px(190), f.px(120), orange, teal);
+    planet(2, f.px(1180), f.px(760), f.px(64), teal);
+    f.add("shape", "moon", f.px(1240), f.px(130), f.px(70), f.px(70), { shape: "moon", fill: cream });
+    const left = column(a.left, f.px(1080));
+    stack(a.top, sky, [space(), heading(f, left, title, 3), captions(f, left, words, 3, 40), space()]);
+    const right = column(f.px(1180), a.right);
+    stack(a.top, sky, [space(), ring(f, f.px(1510), 440, cream, (cy) => avatarAt(f, f.px(1510), cy, 264, portrait)), named(right, 20), space()]);
+    return;
+  }
+  const c = column(a.left, a.right);
+  const d = f.by({ square: 230, portrait: 300, story: 380, landscape: 0 });
+  const planets = (gap: number): Block => {
+    const inner = orbit(d, gap);
+    return { ...inner, draw: (y, h) => {
+      const cy = y + h / 2;
+      const big = f.px(f.by({ square: 140, portrait: 160, story: 180, landscape: 0 }));
+      planet(1, f.width * 0.16, cy - h * 0.18, big, orange, teal);
+      planet(2, f.width * 0.86, cy + h * 0.24, f.px(70), teal);
+      f.add("shape", "moon", f.width * 0.8, cy - h * 0.42, f.px(64), f.px(64), { shape: "moon", fill: cream });
+      inner.draw(y, h);
+    } };
+  };
+  stack(a.top, sky, [
+    heading(f, c, title, 3),
+    space(),
+    planets(0),
+    named(c, f.by({ square: 10, portrait: 16, story: 22, landscape: 0 })),
+    space(),
+    captions(f, c, words, f.by({ square: 2, portrait: 3, story: 3, landscape: 0 })),
+    space(0.4),
+  ]);
+});
+
+/** Warm yellow, the speaker's photo as a big round cut-out low at the left with a soft shadow under it, their name in
+ *  a hand over the title in thin, widely spaced capitals at the top right. */
+const sunnyPortrait = template("sunny-portrait", "Sunny Portrait", { color: "#fbd54c", to: "#f6c531", angle: 160 }, PAPER, (f) => {
+  const ink = "#1d1a14";
+  const rust = "#8a3510";
+  const title: Style = { font: RALEWAY, size: f.by({ square: 46, portrait: 52, story: 58, landscape: 56 }), weight: 300, color: ink, uppercase: true, letterSpacing: 80, align: "right", lineHeight: 1.12 };
+  const name: Style = { font: CAVEAT, size: f.by({ square: 42, portrait: 46, story: 50, landscape: 48 }), weight: 600, color: rust, align: "right" };
+  const words: Style = { font: RALEWAY, size: f.by({ square: 46, portrait: 50, story: 58, landscape: 54 }), weight: 600, color: ink, highlight: ink, align: "right", lineHeight: 1.26 };
+  const tag: Style = { font: RALEWAY, size: f.by({ square: 26, portrait: 26, story: 28, landscape: 27 }), weight: 700, color: ink, uppercase: true, letterSpacing: 160, align: "right" };
+  const a = area(f);
+
+  const d = f.px(f.by({ square: 560, portrait: 680, story: 760, landscape: 880 }));
+  const x = f.px(f.wide ? 40 : 36);
+  const y = (f.tall ? a.bottom : f.height - f.px(f.wide ? 40 : 36)) - d;
+  f.add("shape", "shade", x, y, d, d, { shape: "ellipse", fill: "#f6c531", shadow: true });
+  f.add("avatar", "main", x, y, d, d, { fill: "#fff1c2", color: rust });
+
+  const named = (c: Column) => row(f, name.size! * 1.2, 0, (top, h) => f.add("name", "main", c.x, top, c.w, h, { ...name }));
+  /** The sound over the episode, at the right of the foot. */
+  const footH = f.px(44 + 22) + f.lines(tag.size!, 1, 1);
+  const foot = (right: number, bottom: number) => {
+    f.add("visual", "main", right - f.px(200), bottom - footH, f.px(200), f.px(44), { visual: "bars", color: ink });
+    label(f, "ep", "Ep. 00", right, bottom - f.lines(tag.size!, 1, 1), tag, 0.72);
+  };
+
+  if (f.wide) {
+    const c = column(f.px(1000), a.right);
+    stack(a.top, a.bottom - footH - f.px(30), [named(c), heading(f, c, title, 4, 6), space(0.6), captions(f, c, words, 3, 24), space()]);
+    foot(a.right, a.bottom);
+    return;
+  }
+  const c = column(f.px(f.by({ square: 300, portrait: 300, story: 280, landscape: 0 })), a.right);
+  stack(a.top, y - f.px(24), [
+    named(c),
+    heading(f, c, title, 4, 6),
+    space(0.6),
+    captions(f, column(a.left, a.right), words, f.by({ square: 2, portrait: 3, story: 3, landscape: 0 }), 24),
+    space(),
+  ]);
+  foot(a.right, a.bottom);
+});
+
 /** The podcast templates in the order the picker shows them. */
 export const PODCAST_TEMPLATES: TemplateChoice[] = [
+  colorCollage,
+  portraitBand,
+  pastelPixel,
+  signalYellow,
+  scriptRed,
+  giantType,
+  retroPoster,
+  sunnyPortrait,
   amberFog,
   slateMist,
   nightGlass,
