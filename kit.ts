@@ -1,4 +1,4 @@
-import type { Layer, Layout, Page, Settings, Visual } from "@drkxbt/audiogram";
+import type { Art, Layer, Layout, Page, Settings, Visual } from "@drkxbt/audiogram";
 
 /** The look a user keeps between clips: Audiogram's settings, with each picture shrunk to a data URL. */
 export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layout" | "visual" | "links">> & {
@@ -13,10 +13,45 @@ export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layou
   page?: Page | null;
 };
 
-const KINDS = new Set(["avatar", "name", "handle", "title", "visual", "time", "captions", "links", "text", "image", "video", "shape"]);
-const SHAPES = ["rect", "ellipse", "triangle", "star", "heart", "arrow", "diamond", "bubble"];
-const ENTRANCES = ["fade", "rise", "pop", "slide", "typewriter"];
+const KINDS = new Set(["avatar", "name", "handle", "title", "visual", "time", "captions", "links", "text", "image", "video", "shape", "graphic"]);
+const SHAPES = ["rect", "ellipse", "triangle", "star", "heart", "arrow", "diamond", "bubble", "pentagon", "hexagon", "octagon", "cross", "parallelogram", "arch", "line"];
+const ENTRANCES = ["fade", "rise", "pan", "slide", "pop", "wipe", "blur", "zoom", "breathe", "baseline", "drift", "tumble", "stomp", "bounce", "flicker", "typewriter"];
+const LOOPS = ["pulse", "wiggle", "rotate", "float"];
+const TEXT_EFFECTS = ["lift", "hollow", "splice", "echo", "glitch", "neon"];
+const FILTERS = ["vivid", "warm", "cool", "fade", "retro", "dramatic", "mono", "noir"];
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const THEME_PAINTS = ["text", "muted", "accent", "onAccent", "background"];
+// A drawing is painted on every frame; the largest in the library has 29 paths and 6 KB, so these leave plenty of room.
+const MOST_PATHS = 64;
+const MOST_PATH_DATA = 60_000;
+// Path data: commands and numbers only, so nothing else can ride along in a saved drawing.
+const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]+$/;
+// A colour in a drawing: hex, rgb()/rgba() with numbers only, or the layer's own colour.
+const ART_PAINT = /^(?:#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\)|currentColor|none)$/i;
+
+/** A graphic's drawing from storage, its paths and colours checked, or null when it can't be drawn. */
+function parseArt(value: unknown): Art | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.w !== "number" || typeof v.h !== "number" || !(v.w > 0 && v.w <= 4096) || !(v.h > 0 && v.h <= 4096) || !Array.isArray(v.paths)) return null;
+  if (v.paths.length > MOST_PATHS) return null;
+  let total = 0;
+  const paths: Art["paths"] = [];
+  for (const raw of v.paths) {
+    if (!raw || typeof raw !== "object") continue;
+    const part = raw as Record<string, unknown>;
+    if (typeof part.d !== "string" || part.d.length > 20000 || !PATH.test(part.d) || !/^\s*[Mm]/.test(part.d)) continue;
+    total += part.d.length;
+    if (total > MOST_PATH_DATA) return null;
+    const path: Art["paths"][number] = { d: part.d };
+    if (typeof part.fill === "string" && ART_PAINT.test(part.fill)) path.fill = part.fill;
+    if (typeof part.stroke === "string" && ART_PAINT.test(part.stroke)) path.stroke = part.stroke;
+    if (typeof part.width === "number" && part.width > 0 && part.width <= 100) path.width = part.width;
+    if (part.rule === "evenodd") path.rule = "evenodd";
+    paths.push(path);
+  }
+  return paths.length ? { w: v.w, h: v.h, paths } : null;
+}
 const VISUALS: Visual[] = ["bars", "wave", "pulse"];
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -46,11 +81,16 @@ function parseLayer(value: unknown): Layer | null {
   if (w <= 0 || h <= 0 || w > 4 || h > 4 || Math.abs(x) > 4 || Math.abs(y) > 4) return null;
   const layer: Record<string, unknown> = { id: v.id.slice(0, 80), kind: v.kind, x, y, w, h, rotation: number("rotation") ?? 0, opacity: clamp(number("opacity") ?? 1, 0, 1) };
   const put = (key: string, found: unknown) => found !== undefined && (layer[key] = found);
-  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
+  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase", "underline", "strike", "arrowStart", "arrowEnd"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
   put("text", text("text", 2000));
   put("font", text("font", 80));
   put("image", text("image", 80));
-  for (const key of ["color", "highlight", "fill", "outline", "background"]) put(key, text(key, 40));
+  // Colours are hex or one of the theme's names: anything else could reach the page as CSS and load from elsewhere.
+  for (const key of ["color", "highlight", "fill", "outline", "background", "effectColor", "stroke"]) {
+    const paint = text(key, 40);
+    put(key, paint && (HEX.test(paint) || THEME_PAINTS.includes(paint)) ? paint : undefined);
+  }
+  put("group", text("group", 80));
   const size = number("size");
   put("size", size === undefined ? undefined : clamp(size, 8, 400));
   const weight = number("weight");
@@ -59,6 +99,32 @@ function parseLayer(value: unknown): Layer | null {
   put("radius", radius === undefined ? undefined : clamp(radius, 0, 0.5));
   put("align", ["left", "center", "right"].includes(v.align as string) ? v.align : undefined);
   put("shape", SHAPES.includes(v.shape as string) ? v.shape : undefined);
+  put("mask", SHAPES.includes(v.mask as string) ? v.mask : undefined);
+  put("effect", TEXT_EFFECTS.includes(v.effect as string) ? v.effect : undefined);
+  put("filter", FILTERS.includes(v.filter as string) ? v.filter : undefined);
+  put("list", v.list === "bullet" || v.list === "number" ? v.list : undefined);
+  put("dash", ["solid", "dashed", "dotted"].includes(v.dash as string) ? v.dash : undefined);
+  put("exit", ENTRANCES.includes(v.exit as string) ? v.exit : undefined);
+  put("loop", LOOPS.includes(v.loop as string) ? v.loop : undefined);
+  const ranged = (key: string, low: number, high: number) => {
+    const value = number(key);
+    put(key, value === undefined ? undefined : clamp(value, low, high));
+  };
+  ranged("letterSpacing", -200, 800);
+  ranged("lineHeight", 0.5, 2.5);
+  ranged("curve", -100, 100);
+  ranged("strokeWidth", 0, 100);
+  ranged("speed", 0.25, 4);
+  if (v.crop && typeof v.crop === "object" && !Array.isArray(v.crop)) {
+    const crop = v.crop as Record<string, unknown>;
+    const finite = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
+    put("crop", { x: clamp(finite(crop.x, 0), -1, 1), y: clamp(finite(crop.y, 0), -1, 1), zoom: clamp(finite(crop.zoom, 1), 1, 4) });
+  }
+  if (v.kind === "graphic") {
+    const art = parseArt(v.art);
+    if (!art) return null;
+    layer.art = art;
+  }
   put("visual", VISUALS.includes(v.visual as Visual) ? v.visual : undefined);
   put("enter", ENTRANCES.includes(v.enter as string) ? v.enter : undefined);
   for (const key of ["from", "until"]) {

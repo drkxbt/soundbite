@@ -1,4 +1,4 @@
-import { audiogram, type Editor, type Settings } from "@drkxbt/audiogram";
+import { audiogram, type Editor, type LibraryItem, type Settings, type StockPhoto } from "@drkxbt/audiogram";
 import { isSilent, SPEECH_RATE } from "./audio.js";
 import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
@@ -6,7 +6,11 @@ import { credit } from "./credit.js";
 import { dropHallucinations, mergeCues, wordsToCues } from "./cues.js";
 import { fitPicture, loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
 import type { FontEntry } from "./fonts.js";
+
+/** A photo as photos.json lists it, its files relative to the photos folder. */
+type PhotoEntry = Omit<StockPhoto, "url" | "thumb"> & { file: string; thumb: string };
 import { showThanks } from "./panel.js";
+import { PODCAST_TEMPLATES } from "./templates.js";
 import { loadPictures, savePictures } from "./pictures.js";
 import { Coverage, cutPoint, type Span } from "./sweep.js";
 import { createTranscriber, type Progress } from "./transcribe.js";
@@ -157,6 +161,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   const editor = audiogram(stage, {
     ...kit,
     blank,
+    templates: PODCAST_TEMPLATES,
     page: legacy ? (blank ? undefined : null) : kit.page,
     theme: legacy && blank ? undefined : kit.theme,
     overlay: credit,
@@ -174,6 +179,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       link.download = `soundbite-${stamp}.${extension}`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+      // A still of one moment is a side download: the clean video a watched ad paid for is kept for the clip itself.
+      if (extension === "png") return;
       // A watched ad buys one clean download; the next clip carries the credit again. The key is locked while a
       // video is made, so the credit was already off when this one started.
       if (!creditOn) setCredit(true);
@@ -196,6 +203,22 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     if (Object.keys(pictures).length) await editor.setImages(pictures);
     picturesBack = true;
   });
+  // Graphics, stickers and free photos, bundled next to the app, read once the page has settled so they never hold
+  // up the editor.
+  const libraryAt = new URL("./library/", import.meta.url);
+  const photosAt = new URL("./photos/", import.meta.url);
+  const readJson = <T>(url: URL): Promise<T | null> => fetch(url).then((response) => (response.ok ? (response.json() as Promise<T>) : null)).catch(() => null);
+  setTimeout(() => {
+    void Promise.all([
+      readJson<{ items: LibraryItem[] }>(new URL("graphics.json", libraryAt)),
+      readJson<{ items: LibraryItem[] }>(new URL("stickers.json", libraryAt)),
+      readJson<PhotoEntry[]>(new URL("photos.json", photosAt)),
+    ]).then(([graphics, stickers, photos]) => editor.setLibrary({
+      graphics: graphics?.items ?? [],
+      stickers: stickers?.items ?? [],
+      photos: (photos ?? []).map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
+    }));
+  }, 800);
   editor.slots.actions.append(creditWrap);
   editor.slots.captions.append(redoKey);
 

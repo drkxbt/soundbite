@@ -91,3 +91,43 @@ test("the page's colour is kept as colours, a gradient with its angle, or none f
   assert.deepEqual(parseKit(JSON.stringify({ page: { color: "url(javascript:1)" } })), {});
   assert.deepEqual(parseKit(JSON.stringify({ page: { color: "#fff", to: "red", angle: 900 } })), { page: { color: "#fff" } });
 });
+
+test("the newer layer fields are kept when sound and dropped when not", () => {
+  const art = { w: 24, h: 24, paths: [{ d: "M2 2L22 22", stroke: "currentColor", width: 2 }, { d: "M0 0h4v4z", fill: "#123456", rule: "evenodd" }] };
+  const graphic = { id: "g", kind: "graphic", art, color: "#ff0000", group: "group-1", x: 0.1, y: 0.1, w: 0.2, h: 0.2, rotation: 0, opacity: 1, exit: "fade", loop: "pulse", speed: 1.5 };
+  const words = { id: "t", kind: "text", text: "Hi", x: 0.1, y: 0.1, w: 0.5, h: 0.1, rotation: 0, opacity: 1, effect: "neon", effectColor: "#00ffaa", underline: true, strike: true, letterSpacing: 120, lineHeight: 1.6, list: "bullet", curve: -40 };
+  const shape = { id: "s", kind: "shape", shape: "line", fill: "#111111", stroke: "#222222", strokeWidth: 8, dash: "dashed", arrowStart: true, arrowEnd: true, x: 0.1, y: 0.5, w: 0.5, h: 0.05, rotation: 0, opacity: 1 };
+  const photo = { id: "p", kind: "image", image: "photo-1", mask: "heart", crop: { x: 0.2, y: -0.4, zoom: 1.8 }, filter: "mono", x: 0, y: 0, w: 0.5, h: 0.5, rotation: 0, opacity: 1 };
+  assert.deepEqual(parseKit(JSON.stringify({ layers: { square: [graphic, words, shape, photo] } })).layers.square, [graphic, words, shape, photo]);
+  const bad = parseKit(JSON.stringify({ layers: { square: [
+    { ...graphic, art: { w: 24, h: 24, paths: [{ d: "javascript:alert(1)" }] }, loop: "explode", speed: 99 },
+    { ...words, effect: "melt", list: "stars", curve: 900, letterSpacing: 99999, lineHeight: 0 },
+    { ...photo, mask: "blob", crop: { x: 5, y: "no", zoom: 50 }, filter: "x".repeat(100) },
+  ] } })).layers.square;
+  assert.equal(bad.length, 2, "a graphic with no drawable paths is dropped");
+  const [text, picture] = bad;
+  assert.equal(text.effect, undefined);
+  assert.equal(text.list, undefined);
+  assert.equal(text.curve, 100);
+  assert.equal(text.letterSpacing, 800);
+  assert.equal(text.lineHeight, 0.5);
+  assert.equal(picture.mask, undefined);
+  assert.deepEqual(picture.crop, { x: 1, y: 0, zoom: 4 });
+  assert.equal(picture.filter, undefined);
+});
+
+test("a layer's colours are hex colours or the theme's names, nothing that could load from elsewhere", () => {
+  const base = { id: "t", kind: "text", text: "Hi", x: 0.1, y: 0.1, w: 0.5, h: 0.1, rotation: 0, opacity: 1 };
+  const [kept] = parseKit(JSON.stringify({ layers: { square: [{ ...base, color: "url(https://evil.example/p.png)", fill: "accent", stroke: "#12345678", highlight: "#fff", background: "red" }] } })).layers.square;
+  assert.equal(kept.color, undefined);
+  assert.equal(kept.fill, "accent");
+  assert.equal(kept.stroke, undefined);
+  assert.equal(kept.highlight, "#fff");
+  assert.equal(kept.background, undefined);
+});
+
+test("a drawing too big to paint every frame is dropped", () => {
+  const path = { d: `M0 0${" L1 1".repeat(3000)}`, fill: "#000000" };
+  const heavy = { id: "g", kind: "graphic", art: { w: 24, h: 24, paths: Array.from({ length: 100 }, () => path) }, x: 0, y: 0, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
+  assert.deepEqual(parseKit(JSON.stringify({ layers: { square: [heavy] } })).layers.square, []);
+});

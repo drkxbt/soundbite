@@ -33,6 +33,7 @@
     "failures.ts",
     "sweep.ts",
     "fonts.ts",
-    "pictures.ts"
+    "pictures.ts",
+    "templates.ts"
   ]
 }
