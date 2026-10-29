@@ -222,3 +222,10 @@ test("a drawing's faded parts keep their opacity when saved, and an opacity out 
     assert.equal(parseKit(JSON.stringify({ layers: { square: [odd] } })).layers.square[0].art.paths[0].opacity, undefined, String(opacity));
   }
 });
+
+test("a moving effect laid over the design keeps its see-through ground when saved", () => {
+  const effect = { id: "ambient-1", kind: "ambient", ambient: "bokeh", fill: "none", x: 0, y: 0, w: 1, h: 1, rotation: 0, opacity: 1 };
+  assert.equal(parseKit(JSON.stringify({ layers: { square: [effect] } })).layers.square[0].fill, "none");
+  const text = { id: "t", kind: "text", text: "Hi", fill: "none", x: 0, y: 0, w: 0.5, h: 0.1, rotation: 0, opacity: 1 };
+  assert.equal(parseKit(JSON.stringify({ layers: { square: [text] } })).layers.square[0].fill, undefined, "only an effect has no ground");
+});

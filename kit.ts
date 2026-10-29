@@ -111,6 +111,8 @@ function parseLayer(value: unknown): Layer | null {
   put("image", text("image", 80));
   // Colours are hex or one of the theme's names: anything else could reach the page as CSS and load from elsewhere.
   for (const key of ["color", "highlight", "fill", "outline", "background", "effectColor", "stroke"]) put(key, paintIn(v[key]));
+  // A moving effect laid over the design has no ground of its own.
+  if (v.kind === "ambient" && v.fill === "none") put("fill", "none");
   put("group", text("group", 80));
   const size = number("size");
   put("size", size === undefined ? undefined : clamp(size, 8, 400));
