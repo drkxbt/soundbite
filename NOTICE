@@ -13,11 +13,9 @@ demo/fonts/, under the SIL Open Font License 1.1 (demo/fonts/OFL.txt). The sampl
 made-up exchange read by the Microsoft David and Microsoft Zira text-to-speech voices; it is not a recording of any
 real Space or person.
 
-The editor's graphics and stickers are converted at build time from Lucide (ISC), Flat Color Icons by Icons8 (MIT),
-Simple Icons (CC0 1.0) and Fluent Emoji by Microsoft (MIT); dist/app/library/LICENSES.md names each with its source.
-Brand marks among the graphics belong to their owners and are offered only so a clip can say where to listen; none of
-those companies has any connection with this project. The photos in photos/ are in the public domain (CC0), found
-through Openverse; photos/CREDITS.md credits each one's photographer.
+The editor's fonts come from Fontsource under the SIL Open Font License 1.1, each one's licence copied next to it in
+dist/app/fonts/. The ornaments in the podcast designs are drawn in ornaments.ts for this project. The photos in photos/
+are in the public domain (CC0), found through Openverse; photos/CREDITS.md credits each one's photographer.
 
 X is named only to say what the clips are for; X Corp. has no connection with this project. Google Ad Manager serves
 the optional rewarded ad on drk.vc's copy; Google has no connection with this project either.

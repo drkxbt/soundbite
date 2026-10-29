@@ -10,19 +10,21 @@ Hosted audiogram apps upload the recording, then charge a monthly plan for autom
 
 - **The whole recording, captioned.** Open a recording and every minute of it is captioned, two minutes at a time, starting with the part you select; MP3 and WAV files can be hours long. Each stretch ends at a sentence's end or a pause where it can, so words aren't cut at the joins. Auto captions at the top pauses and resumes, and the line beside it says how far it has got.
 - **Captions without typing.** Whisper (tiny, multilingual) runs in a worker through transformers.js. The encoder runs on WebGPU and the decoder on WebAssembly when there is a GPU, and everything runs on WebAssembly when there isn't. The recording is transcribed two minutes at a time, the part you selected first; each two minutes takes about 10 to 45 seconds on a laptop. Every word keeps its own time, so the captions light up as each word is said.
-- **Several moments, one clip.** Add each moment as a part and they play back to back, in an order you can drag; parts are captioned before the rest of the recording, and the joins fade so a cut mid-word doesn't click.
+- **Several moments, several recordings, one clip.** Split cuts the clip in two at the playhead so each half can be trimmed on its own, and Add recording brings in another file from your computer after what is in the clip, captioned as soon as it opens. The parts play back to back, in an order you can drag; they are captioned before the rest, and a join between two cuts fades so a cut mid-word doesn't click.
 - **Fix anything.** The captions land in Audiogram's editor, where any line can be retyped or retimed by tapping along. Silence is caught before Whisper runs, and the stock phrases Whisper writes over noise, in any language, count as no speech, so your captions stay as they were.
-- **Design every frame.** A recording brings only its sound; the picture starts as a white page, or as one of twenty podcast designs laid out for every shape.
-  - Add captions, sound bars, a wave or a pulse, your name and picture, headings and pairs of fonts, sixteen shapes, lines and arrows, photo frames and grids.
-  - Add over 2,500 graphics and 300 stickers with a search, forty free photos, and your own photos and videos.
+- **Design every frame.** A recording brings only its sound; the picture starts as a white page, or as one of twenty classic podcast designs, gilded, letterpressed and Art Deco, each laid out for every shape and each keeping its own background.
+  - Elements has a section for each kind of part, painted in your design's colours: captions and sound, shapes, lines and curves, photo frames and grids, free photos, moving backgrounds, charts, tables, device mockups and 3D shapes, with a search and the ones you used last first.
+  - Add headings and pairs of fonts, forty free photos, and your own photos and videos; drop a photo on a frame to fill it.
+  - Colour anything from a picker with the colours already in your design, a set of defaults, gold, rose gold, silver, bronze and champagne finishes, gradients for the page, and any shade at all.
+  - Start over clears the design in one step, and Undo brings it back.
   - Pick several things at once, group them, align and spread them; right-click for a menu.
   - Set fonts, spacing and effects for words, borders for shapes, and crops, frames and filters for pictures.
-  - Choose how each part comes in, goes and moves, and when it shows.
+  - Choose how each part comes in, goes and moves from tiles that show each movement, word by word if you like, then play it once on the picture.
   - Zoom in to work closely.
   - The layout of each shape and your uploads are kept in this browser for next time.
 - **Clips as long as the recording.** A recording opens fully selected and plays from end to end; trim it to any stretch, however long, and the download works through it twenty seconds at a time. A percent shows while a recording is read in.
-- **47 fonts for English text.** Open-licence fonts from Fontsource, from Inter and Poppins to Bebas Neue, Playfair Display and Permanent Marker, bundled with the app and fetched only when used.
-- **Your look on it.** A background picture behind the whole clip, dimmed so the words stay readable, up to three links along the bottom, and music under your voice at the level you set. Then Audiogram's own: square, 4:5, 9:16 or 16:9; bars, a wave or a pulse; five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
+- **57 fonts for English text.** Open-licence fonts from Fontsource, from Inter and Poppins to Cinzel, Playfair Display, Bodoni Moda and Pinyon Script, bundled with the app and fetched only when used.
+- **Your look on it.** A background picture or video behind the design, up to three links along the bottom, and music under your voice at the level you set. Then Audiogram's own: square, 4:5, 9:16 or 16:9; bars, a wave or a pulse; five colour themes, your picture, name, handle and title, and an MP4 made faster than it plays where the browser has WebCodecs.
 - **Your look, kept.** Name, handle, links, pictures, shape and colours are kept in this browser and filled in next time.
 - **A credit, and a way to drop it.** Clips made at drk.vc/soundbite carry a small "made with drk.vc/soundbite" in the corner. Watching one short rewarded ad removes it from the next download; until ads are switched on there, it comes off for free. A copy you run yourself has no ad unit, so its credit comes off for free too.
 

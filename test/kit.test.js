@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseKit } from "../dist/kit.js";
+import { dataUrlBlob, parseKit } from "../dist/kit.js";
 
 test("nothing saved, or something unreadable, is an empty kit", () => {
   assert.deepEqual(parseKit(null), {});
@@ -74,7 +74,7 @@ test("a layer's look, its flips and tone, its way in and its times are kept, eac
   const sound = { id: "s", kind: "visual", visual: "pulse", x: 0.1, y: 0.5, w: 0.8, h: 0.2, rotation: 0, opacity: 1 };
   const star = { id: "st", kind: "shape", shape: "star", fill: "#ff0000", x: 0.3, y: 0.3, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
   assert.deepEqual(parseKit(JSON.stringify({ layers: { square: [good, words, sound, star] } })).layers.square, [good, words, sound, star]);
-  const bad = parseKit(JSON.stringify({ layers: { square: [{ ...good, enter: "explode", from: -3, until: "soon", adjust: { brightness: 9, blur: "x" }, visual: "lasers", shape: "blob", flipY: "yes" }] } })).layers.square[0];
+  const bad = parseKit(JSON.stringify({ layers: { square: [{ ...good, enter: "explode", from: -3, until: "soon", adjust: { brightness: 9, blur: "x" }, visual: "lasers", shape: "splat", flipY: "yes" }] } })).layers.square[0];
   assert.equal(bad.enter, undefined);
   assert.equal(bad.from, 0);
   assert.equal(bad.until, undefined);
@@ -102,7 +102,7 @@ test("the newer layer fields are kept when sound and dropped when not", () => {
   const bad = parseKit(JSON.stringify({ layers: { square: [
     { ...graphic, art: { w: 24, h: 24, paths: [{ d: "javascript:alert(1)" }] }, loop: "explode", speed: 99 },
     { ...words, effect: "melt", list: "stars", curve: 900, letterSpacing: 99999, lineHeight: 0 },
-    { ...photo, mask: "blob", crop: { x: 5, y: "no", zoom: 50 }, filter: "x".repeat(100) },
+    { ...photo, mask: "splat", crop: { x: 5, y: "no", zoom: 50 }, filter: "x".repeat(100) },
   ] } })).layers.square;
   assert.equal(bad.length, 2, "a graphic with no drawable paths is dropped");
   const [text, picture] = bad;
@@ -130,4 +130,57 @@ test("a drawing too big to paint every frame is dropped", () => {
   const path = { d: `M0 0${" L1 1".repeat(3000)}`, fill: "#000000" };
   const heavy = { id: "g", kind: "graphic", art: { w: 24, h: 24, paths: Array.from({ length: 100 }, () => path) }, x: 0, y: 0, w: 0.2, h: 0.2, rotation: 0, opacity: 1 };
   assert.deepEqual(parseKit(JSON.stringify({ layers: { square: [heavy] } })).layers.square, []);
+});
+
+const layerIn = (extra) => parseKit(JSON.stringify({ layers: { square: [{ id: "a", kind: "shape", x: 0.1, y: 0.1, w: 0.2, h: 0.2, rotation: 0, opacity: 1, ...extra }] } })).layers?.square?.[0];
+
+test("metal finishes are kept by name, and anything that only looks like one is dropped", () => {
+  assert.equal(layerIn({ fill: "metal:gold" }).fill, "metal:gold");
+  assert.equal(layerIn({ color: "metal:rose" }).color, "metal:rose");
+  assert.equal(layerIn({ fill: "metal:platinum" }).fill, undefined);
+  assert.equal(layerIn({ fill: "linear-gradient(red, blue)" }).fill, undefined);
+});
+
+test("the new kinds come back with their own fields, checked and held in range", () => {
+  const chart = layerIn({ kind: "chart", chart: "donut", data: [{ label: "Yes", value: 62, color: "#00bf63" }, { label: "No", value: Infinity }, { label: 3, value: 1 }, { label: "Maybe", value: 5e12, color: "url(x)" }], prefix: "$1234567890", showGrid: true });
+  assert.equal(chart.kind, "chart");
+  assert.equal(chart.chart, "donut");
+  assert.deepEqual(chart.data, [{ label: "Yes", value: 62, color: "#00bf63" }, { label: "Maybe", value: 1e9 }]);
+  assert.equal(chart.prefix, "$1234567");
+  assert.equal(chart.showGrid, true);
+  const rows = Array.from({ length: 14 }, (_, i) => ({ label: `Row ${i}`, value: i }));
+  assert.equal(layerIn({ kind: "chart", data: rows }).data.length, 12);
+  const table = layerIn({ kind: "table", cells: Array.from({ length: 12 }, () => ["a", "b", "c", "d", "e", "f", "g", 4]), header: true, rules: "grid" });
+  assert.equal(table.cells.length, 10);
+  assert.deepEqual(table.cells[0], ["a", "b", "c", "d", "e", "f"]);
+  assert.equal(table.rules, "grid");
+  assert.equal(layerIn({ kind: "table", rules: "dotted" }).rules, undefined);
+  assert.equal(layerIn({ kind: "mockup", device: "laptop" }).device, "laptop");
+  assert.equal(layerIn({ kind: "mockup", device: "watch" }).device, undefined);
+  assert.equal(layerIn({ kind: "solid", solid: "torus", gloss: false }).gloss, false);
+  const ambient = layerIn({ kind: "ambient", ambient: "bokeh", pace: 9, react: true });
+  assert.equal(ambient.ambient, "bokeh");
+  assert.equal(ambient.pace, 3);
+  assert.equal(ambient.react, true);
+});
+
+test("words that hug their text, a background and the newer ways in and out are kept", () => {
+  const text = layerIn({ kind: "text", text: "Hi", autoWidth: true, enter: "ascend", exit: "shine", loop: "shimmer", direction: "left" });
+  assert.equal(text.autoWidth, true);
+  assert.equal(text.enter, "ascend");
+  assert.equal(text.exit, "shine");
+  assert.equal(text.loop, "shimmer");
+  assert.equal(text.direction, "left");
+  assert.equal(layerIn({ direction: "sideways" }).direction, undefined);
+  assert.equal(layerIn({ kind: "image", backdrop: true }).backdrop, true);
+  assert.equal(layerIn({ shape: "burst" }).shape, "burst");
+  assert.equal(layerIn({ shape: "line", bend: 400, cap: "round" }).bend, 100);
+});
+
+test("a background kept as a data URL becomes a picture again, and anything else is not one", () => {
+  const blob = dataUrlBlob("data:image/png;base64,iVBORw0KGgo=");
+  assert.equal(blob.type, "image/png");
+  assert.equal(blob.size, 8);
+  assert.equal(dataUrlBlob("data:text/html;base64,PHNjcmlwdD4="), null);
+  assert.equal(dataUrlBlob("https://example.com/a.png"), null);
 });

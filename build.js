@@ -2,7 +2,6 @@
 import { build } from "esbuild";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { writeLibrary } from "./scripts/library.js";
 
 const out = "dist/app";
 await build({
@@ -58,10 +57,3 @@ await writeFile(`${out}/fonts/fonts.json`, JSON.stringify(fonts));
 // the script has since replaced is not left behind.
 await rm(`${out}/photos`, { recursive: true, force: true });
 await cp("photos", `${out}/photos`, { recursive: true });
-
-// The editor's graphics and stickers: free icon sets flattened to path data, so drawing one never taints the canvas,
-// with each set's licence beside them. An icon that can't be flattened is left out, and the count of those is shown.
-for (const { set, count, skipped } of await writeLibrary(`${out}/library`)) {
-  const lost = Object.entries(skipped).map(([reason, n]) => `${n} (${reason})`);
-  if (lost.length) console.log(`library: kept ${count} from ${set}, left out ${lost.join(", ")}`);
-}

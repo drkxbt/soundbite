@@ -11,16 +11,31 @@ export type Kit = Partial<Pick<Settings, "title" | "speaker" | "handle" | "layou
   layers?: Partial<Record<Layout, Layer[]>>;
   /** The page's own colour, or null for the theme's; missing in a kit from before pages had one. */
   page?: Page | null;
+  /** The Elements added lately, newest first, by the editor's own names for them. */
+  recent?: string[];
 };
 
-const KINDS = new Set(["avatar", "name", "handle", "title", "visual", "time", "captions", "links", "text", "image", "video", "shape", "graphic"]);
-const SHAPES = ["rect", "ellipse", "triangle", "star", "heart", "arrow", "diamond", "bubble", "pentagon", "hexagon", "octagon", "cross", "parallelogram", "arch", "line"];
-const ENTRANCES = ["fade", "rise", "pan", "slide", "pop", "wipe", "blur", "zoom", "breathe", "baseline", "drift", "tumble", "stomp", "bounce", "flicker", "typewriter"];
-const LOOPS = ["pulse", "wiggle", "rotate", "float"];
+const KINDS = new Set(["avatar", "name", "handle", "title", "visual", "time", "captions", "links", "text", "image", "video", "shape", "graphic", "chart", "table", "mockup", "solid", "ambient"]);
+const SHAPES = [
+  "rect", "ellipse", "triangle", "star", "heart", "arrow", "diamond", "bubble", "pentagon", "hexagon", "octagon", "cross", "parallelogram", "arch", "line",
+  "burst", "sparkle", "squircle", "blob", "ring", "quote", "banner", "tag", "chevron", "cloud", "moon", "check",
+];
+const ENTRANCES = [
+  "fade", "rise", "pan", "slide", "pop", "wipe", "blur", "zoom", "breathe", "baseline", "drift", "tumble", "stomp", "bounce", "flicker", "typewriter",
+  "ascend", "shift", "merge", "burst", "cascade", "spread", "block", "clarify", "glide", "roll", "skate", "elastic", "flip", "unfold", "iris", "curtain", "fall", "tectonic", "scrapbook", "shine", "grow",
+];
+const LOOPS = ["pulse", "wiggle", "rotate", "float", "sway", "heartbeat", "shimmer", "flash", "slowZoom"];
+const DIRECTIONS = ["up", "down", "left", "right"];
+const CHARTS = ["column", "bar", "line", "area", "pie", "donut", "ring", "progress", "number", "poll"];
+const DEVICES = ["phone", "tablet", "laptop", "monitor", "tv", "browser", "polaroid", "vinyl"];
+const SOLIDS = ["sphere", "cube", "cylinder", "cone", "torus", "pyramid", "capsule"];
+const AMBIENTS = ["aurora", "flow", "bokeh", "particles", "waves", "rays", "grid", "grain"];
 const TEXT_EFFECTS = ["lift", "hollow", "splice", "echo", "glitch", "neon"];
 const FILTERS = ["vivid", "warm", "cool", "fade", "retro", "dramatic", "mono", "noir"];
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 const THEME_PAINTS = ["text", "muted", "accent", "onAccent", "background"];
+// Named finishes the painter draws as gradients of its own; only these names, never a CSS value.
+const METAL_PAINTS = ["metal:gold", "metal:rose", "metal:silver", "metal:bronze", "metal:champagne"];
 // A drawing is painted on every frame; the largest in the library has 29 paths and 6 KB, so these leave plenty of room.
 const MOST_PATHS = 64;
 const MOST_PATH_DATA = 60_000;
@@ -53,6 +68,12 @@ function parseArt(value: unknown): Art | null {
   return paths.length ? { w: v.w, h: v.h, paths } : null;
 }
 const VISUALS: Visual[] = ["bars", "wave", "pulse"];
+
+/** A colour from storage when it is a hex colour, one of the theme's names or a metal; otherwise nothing. */
+function paintIn(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 40) return undefined;
+  return HEX.test(value) || THEME_PAINTS.includes(value) || METAL_PAINTS.includes(value) ? value : undefined;
+}
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
 /** A page colour from storage: a hex colour, with a gradient's second colour and angle when they are sound. */
@@ -81,15 +102,12 @@ function parseLayer(value: unknown): Layer | null {
   if (w <= 0 || h <= 0 || w > 4 || h > 4 || Math.abs(x) > 4 || Math.abs(y) > 4) return null;
   const layer: Record<string, unknown> = { id: v.id.slice(0, 80), kind: v.kind, x, y, w, h, rotation: number("rotation") ?? 0, opacity: clamp(number("opacity") ?? 1, 0, 1) };
   const put = (key: string, found: unknown) => found !== undefined && (layer[key] = found);
-  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase", "underline", "strike", "arrowStart", "arrowEnd"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
+  for (const key of ["hidden", "locked", "italic", "flipX", "flipY", "shadow", "uppercase", "underline", "strike", "arrowStart", "arrowEnd", "autoWidth", "backdrop", "header", "stripes", "showLabels", "showValues", "showGrid", "gloss", "react"]) put(key, typeof v[key] === "boolean" ? v[key] : undefined);
   put("text", text("text", 2000));
   put("font", text("font", 80));
   put("image", text("image", 80));
   // Colours are hex or one of the theme's names: anything else could reach the page as CSS and load from elsewhere.
-  for (const key of ["color", "highlight", "fill", "outline", "background", "effectColor", "stroke"]) {
-    const paint = text(key, 40);
-    put(key, paint && (HEX.test(paint) || THEME_PAINTS.includes(paint)) ? paint : undefined);
-  }
+  for (const key of ["color", "highlight", "fill", "outline", "background", "effectColor", "stroke"]) put(key, paintIn(v[key]));
   put("group", text("group", 80));
   const size = number("size");
   put("size", size === undefined ? undefined : clamp(size, 8, 400));
@@ -106,6 +124,33 @@ function parseLayer(value: unknown): Layer | null {
   put("dash", ["solid", "dashed", "dotted"].includes(v.dash as string) ? v.dash : undefined);
   put("exit", ENTRANCES.includes(v.exit as string) ? v.exit : undefined);
   put("loop", LOOPS.includes(v.loop as string) ? v.loop : undefined);
+  put("direction", DIRECTIONS.includes(v.direction as string) ? v.direction : undefined);
+  put("chart", CHARTS.includes(v.chart as string) ? v.chart : undefined);
+  put("device", DEVICES.includes(v.device as string) ? v.device : undefined);
+  put("solid", SOLIDS.includes(v.solid as string) ? v.solid : undefined);
+  put("ambient", AMBIENTS.includes(v.ambient as string) ? v.ambient : undefined);
+  put("rules", ["none", "rows", "grid"].includes(v.rules as string) ? v.rules : undefined);
+  put("cap", v.cap === "round" ? "round" : undefined);
+  put("prefix", text("prefix", 8));
+  put("suffix", text("suffix", 8));
+  // A chart's rows: up to twelve, each a short label and a finite value, with a colour of its own if it is sound.
+  if (Array.isArray(v.data)) {
+    const rows = v.data.flatMap((row): Array<Record<string, unknown>> => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+      const r = row as Record<string, unknown>;
+      if (typeof r.label !== "string" || typeof r.value !== "number" || !Number.isFinite(r.value)) return [];
+      const datum: Record<string, unknown> = { label: r.label.slice(0, 40), value: clamp(r.value, -1e9, 1e9) };
+      const colour = paintIn(r.color);
+      if (colour) datum.color = colour;
+      return [datum];
+    }).slice(0, 12);
+    put("data", rows.length ? rows : undefined);
+  }
+  // A table's cells: up to ten rows of up to six short strings.
+  if (Array.isArray(v.cells)) {
+    const rows = v.cells.filter(Array.isArray).slice(0, 10).map((row) => (row as unknown[]).slice(0, 6).map((cell) => (typeof cell === "string" ? cell.slice(0, 120) : "")));
+    put("cells", rows.length && rows.every((row) => row.length) ? rows : undefined);
+  }
   const ranged = (key: string, low: number, high: number) => {
     const value = number(key);
     put(key, value === undefined ? undefined : clamp(value, low, high));
@@ -115,6 +160,9 @@ function parseLayer(value: unknown): Layer | null {
   ranged("curve", -100, 100);
   ranged("strokeWidth", 0, 100);
   ranged("speed", 0.25, 4);
+  ranged("pace", 0.25, 3);
+  ranged("bend", -100, 100);
+  ranged("max", -1e9, 1e9);
   if (v.crop && typeof v.crop === "object" && !Array.isArray(v.crop)) {
     const crop = v.crop as Record<string, unknown>;
     const finite = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
@@ -183,6 +231,11 @@ export function parseKit(raw: string | null): Kit {
   }
   const page = parsePage(value.page);
   if (page !== undefined) kit.page = page;
+  // Recently used: a short list of the editor's own names for its elements, such as "shape:star".
+  if (Array.isArray(value.recent)) {
+    const recent = value.recent.filter((item): item is string => typeof item === "string" && /^[a-z0-9]+:[a-z0-9-]+$/.test(item)).slice(0, 12);
+    if (recent.length) kit.recent = recent;
+  }
   return kit;
 }
 
@@ -200,6 +253,18 @@ export function saveKit(kit: Kit): void {
     localStorage.setItem(KEY, JSON.stringify(kit));
   } catch {
     // Not kept this time; the clip itself is unaffected.
+  }
+}
+
+/** A picture kept as a data URL, as a Blob again, or null when it isn't a picture's data URL. */
+export function dataUrlBlob(url: string): Blob | null {
+  const match = /^data:(image\/[a-z0-9.+-]+)(;base64)?,(.*)$/is.exec(url);
+  if (!match) return null;
+  try {
+    const text = match[2] ? atob(match[3]) : decodeURIComponent(match[3]);
+    return new Blob([Uint8Array.from(text, (letter) => letter.charCodeAt(0))], { type: match[1].toLowerCase() });
+  } catch {
+    return null;
   }
 }
 

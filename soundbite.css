@@ -35,6 +35,7 @@
   --ag-wave: rgb(255 255 255 / 0.22);
   --ag-wave-in: var(--sb-text);
   --ag-stage: var(--sb-ground);
+  --ag-frame-edge: rgb(255 255 255 / 0.32);
 }
 .sb svg .fill { fill: currentColor; stroke: none; }
 .sb ::selection { background: var(--sb-mint-wash); color: var(--sb-text); }

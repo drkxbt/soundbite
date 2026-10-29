@@ -1,7 +1,12 @@
-/* Twenty ready-made looks for podcast and live audio clips, each laid out for every frame shape the editor offers. A
-   template is only layers, so once it is picked every part of it can be moved, restyled or deleted, and the words on
-   its labels are sample copy for the user to change. Free of the DOM, so it can be tested on its own. */
-import { FRAME_SIZES, type Art, type Layer, type LayerKind, type Layout, type Page, type Template } from "@drkxbt/audiogram";
+/* Twenty ready-made looks for podcast and live audio clips, in a classic and quietly luxurious manner: jewel and paper
+   grounds, gilt rules and ornaments, high-contrast serifs and wide-set capitals, each laid out for every frame shape the
+   editor offers. A template is only layers, so once it is picked every part of it can be moved, restyled or deleted,
+   and the words on its labels are sample copy for the user to change. Free of the DOM, so it can be tested on its own. */
+import { FRAME_SIZES, type Art, type Layer, type LayerKind, type Layout, type Page, type Paint, type Template } from "@drkxbt/audiogram";
+import {
+  archBorder, beadRing, border, cartouche, crown, decoCorner, decoFan, decoWings, divider, fleurDeLis, flourishCorner, hedera, laurelSprig, laurelWreath,
+  marbleVeins, ribbonMic, rings, rosette, scrollDivider, sparkles, spineBand, sunburst, taperedRule, trellis, waxSeal, type BorderStyle,
+} from "./ornaments.js";
 
 /** A design the user can start a clip from, laid out for whichever frame shape they picked. */
 export interface TemplateChoice {
@@ -12,15 +17,37 @@ export interface TemplateChoice {
 
 type Style = Partial<Omit<Layer, "id" | "kind" | "x" | "y" | "w" | "h">>;
 
-// Places in THEMES. A template sets every colour it can, but the theme still paints the avatar's initial when there is
-// no photo and the words of a caption not yet said, so each template names a theme whose muted colour reads on its page.
+// Places in THEMES. A template sets every colour it can, but the theme still paints the avatar when there is no photo
+// and the words of a caption not yet said, so each template names a theme whose muted colour reads on its page.
 const INK = 0;
 const PAPER = 1;
 const MINT = 2;
 const DUSK = 3;
 const EMBER = 4;
 
-const MONO = "JetBrains Mono Variable";
+// The painter lays a metal across a layer's box as polished light; a caption's highlight stays a flat colour, since
+// the word on it takes black or white by how light it is.
+const GOLD = "metal:gold";
+const ROSE = "metal:rose";
+const SILVER = "metal:silver";
+const BRONZE = "metal:bronze";
+const CHAMPAGNE = "metal:champagne";
+
+const CINZEL = "Cinzel Variable";
+const CINZEL_DECO = "Cinzel Decorative";
+const CORMORANT = "Cormorant Garamond Variable";
+const PLAYFAIR = "Playfair Display Variable";
+const BODONI = "Bodoni Moda Variable";
+const BASKERVILLE = "Libre Baskerville";
+const TENOR = "Tenor Sans";
+const MARCELLUS = "Marcellus";
+const PRATA = "Prata";
+const ITALIANA = "Italiana";
+const GILDA = "Gilda Display";
+const LIMELIGHT = "Limelight";
+const INSTRUMENT = "Instrument Serif";
+const PINYON = "Pinyon Script";
+const VIBES = "Great Vibes";
 
 /** A frame shape being laid out in its own pixels; the layers keep their boxes as fractions of it, as the editor does. */
 interface Frame {
@@ -57,7 +84,10 @@ function template(id: string, name: string, page: Page, theme: number, draw: (fr
         tall: layout === "story",
         by: (values) => values[layout],
         add: (kind, name, x, y, w, h, style = {}) => {
-          layers.push({ id: `${kind}-${name}`, kind, x: x / width, y: y / height, w: w / width, h: h / height, rotation: 0, opacity: 1, ...style });
+          // A label's box hugs its words, so it can be picked and moved by what shows of it. Without the speaker's
+          // photo, the portrait is their initial on gold rather than on the theme's accent, which suits no design here.
+          const fit = kind === "text" ? { autoWidth: true } : kind === "avatar" ? { fill: "metal:gold" } : {};
+          layers.push({ id: `${kind}-${name}`, kind, x: x / width, y: y / height, w: w / width, h: h / height, rotation: 0, opacity: 1, ...fit, ...style });
         },
         lines: (size, count = 1, spacing = 1.15) => size * unit * spacing * count,
       });
@@ -66,1005 +96,1208 @@ function template(id: string, name: string, page: Page, theme: number, draw: (fr
   };
 }
 
-/** Where a line of words starts so its capitals sit centred on `middle`: canvas words hang from the top of their em
- *  box, and capitals fill roughly the band between a twentieth and four fifths of the size below it. */
-function capsTop(f: Frame, middle: number, size: number): number {
-  return middle - size * f.unit * 0.42;
+/** The part of the frame words keep to: the margin all round, and on a story the bands the apps cover at top and foot. */
+function area(f: Frame, inset = 1) {
+  const left = f.pad * inset;
+  const top = f.tall ? f.height * 0.1 : f.pad * inset;
+  const bottom = f.tall ? f.height * 0.85 : f.height - f.pad * inset;
+  return { left, right: f.width - left, top, bottom, cx: f.width / 2, w: f.width - left * 2 };
 }
 
-/** How wide a line of JetBrains Mono runs: every letter takes six tenths of the size, and the spacing after it. */
-function monoWidth(f: Frame, text: string, size: number, spacing = 0): number {
-  return text.length * size * f.unit * (0.6 + spacing / 1000);
+/** A run across the frame for a stack of blocks: its left edge and its width. */
+interface Column {
+  x: number;
+  w: number;
 }
 
-interface PillStyle {
-  size: number;
-  fill: string;
-  color: string;
-  height?: number;
-  spacing?: number;
-  stroke?: string;
+/** Part of a stack: its height, the space before it, and how it lays itself down once it knows where it starts. A
+ *  flexible block takes a share of the height the others leave, by its weight. */
+interface Block {
+  h: number;
+  gap: number;
+  flex?: number;
+  draw(y: number, h: number): void;
 }
 
-/** A short label on a round-ended pill sized to fit it, set in a monospaced face so its width is known before it is
- *  drawn. Returns the pill's width, so a row can be laid out from it. */
-function pill(f: Frame, name: string, x: number, y: number, text: string, style: PillStyle): number {
-  const { size, spacing = 140 } = style;
-  const h = (style.height ?? size * 2.3) * f.unit;
-  const w = monoWidth(f, text, size, spacing) + h;
-  f.add("shape", name, x, y, w, h, { shape: "rect", radius: 0.5, fill: style.fill, ...(style.stroke ? { stroke: style.stroke, strokeWidth: 2 } : {}) });
-  f.add("text", name, x, capsTop(f, y + h / 2, size), w, f.lines(size), { text, font: MONO, size, weight: 700, color: style.color, align: "center", uppercase: true, letterSpacing: spacing });
-  return w;
+/** Blocks laid down a column from `top` to `bottom`; the height left over goes to the flexible ones, or above and
+ *  below the whole stack when none is, so it sits in the middle. */
+function stack(top: number, bottom: number, blocks: Array<Block | false>): void {
+  const list = blocks.filter((block): block is Block => Boolean(block));
+  const used = list.reduce((sum, block) => sum + block.h + block.gap, 0);
+  const spare = Math.max(0, bottom - top - used);
+  const weight = list.reduce((sum, block) => sum + (block.flex ?? 0), 0);
+  let y = top + (weight ? 0 : spare / 2);
+  for (const block of list) {
+    y += block.gap;
+    const h = block.h + (weight ? (spare * (block.flex ?? 0)) / weight : 0);
+    block.draw(y, h);
+    y += h;
+  }
 }
 
-/** The avatar with the name and the handle stacked beside it, centred on it, the three running `w` wide. */
-function byline(f: Frame, x: number, y: number, side: number, w: number, name: Style, handle: Style): void {
-  const nameH = f.lines(name.size ?? 40, 1, 1.3);
-  const handleH = f.lines(handle.size ?? 30, 1, 1.3);
-  const textX = x + side * 1.22;
-  const top = y + (side - nameH - handleH) / 2;
-  f.add("avatar", "main", x, y, side, side);
-  f.add("name", "main", textX, top, x + w - textX, nameH, { align: "left", ...name });
-  f.add("handle", "main", textX, top + nameH, x + w - textX, handleH, { align: "left", ...handle });
+/** Room that soaks up a share of what the stack leaves over, to hold the parts round it apart. */
+function space(flex = 1): Block {
+  return { h: 0, gap: 0, flex, draw: () => {} };
 }
 
-/** A disc just larger than the avatar it sits under, so the avatar reads as framed by a ring of `fill`. */
-function ring(f: Frame, x: number, y: number, side: number, thickness: number, fill: string): void {
-  const t = thickness * f.unit;
-  f.add("shape", "ring", x - t, y - t, side + t * 2, side + t * 2, { shape: "ellipse", fill });
+/** One line of a label across the column, centred unless the style says otherwise. */
+function label(f: Frame, c: Column, name: string, text: string, style: Style, gap = 0): Block {
+  const h = f.lines(style.size ?? 24, 1, style.lineHeight ?? 1.25);
+  return { h, gap: gap * f.unit, draw: (y) => f.add("text", name, c.x, y, c.w, h, { text, align: "center", lineHeight: 1.25, ...style }) };
 }
 
-const CUP: Art = {
-  w: 64,
-  h: 64,
-  paths: [
-    { d: "M8 24h40v12c0 10-8 18-18 18h-4C16 54 8 46 8 36z", fill: "currentColor" },
-    { d: "M48 28h3a8 8 0 0 1 0 16h-4", stroke: "currentColor", width: 5 },
-    { d: "M21 5c-4 4 4 7 0 12M33 5c-4 4 4 7 0 12", stroke: "currentColor", width: 4 },
-    { d: "M4 60h52", stroke: "currentColor", width: 5 },
-  ],
-};
+/** The clip's title, room for `count` lines of it. */
+function heading(f: Frame, c: Column, style: Style, count = 2, gap = 0): Block {
+  const h = f.lines(style.size ?? 50, count, style.lineHeight ?? 1.15);
+  return { h, gap: gap * f.unit, draw: (y) => f.add("title", "main", c.x, y, c.w, h, { align: "center", ...style }) };
+}
 
-const LEAF: Art = {
-  w: 48,
-  h: 48,
-  paths: [
-    { d: "M42 6C22 6 7 17 7 33c0 3 1 6 3 8 2-12 10-21 22-26-10 7-16 16-17 27 2 1 4 1 6 1 17 0 23-15 21-37z", fill: "currentColor" },
-  ],
-};
+/** A drawing `w` design pixels wide, centred on `cx`, as tall as its own shape makes it. */
+function ornament(f: Frame, cx: number, name: string, art: Art, w: number, style: Style, gap = 0): Block {
+  const width = w * f.unit;
+  const h = (width * art.h) / art.w;
+  return { h, gap: gap * f.unit, draw: (y) => f.add("graphic", name, cx - width / 2, y, width, h, { art, ...style }) };
+}
 
-/** A rising line chart with the ground under it shaded, drawn for a box `ratio` times as wide as it is tall, so it
- *  fills the box instead of shrinking into the middle of it. */
-function chartArt(ratio: number, line: string, ground: string): Art {
-  const h = 100;
-  const w = h * ratio;
-  const rises = [0.78, 0.66, 0.72, 0.52, 0.58, 0.4, 0.47, 0.3, 0.36, 0.18, 0.24, 0.1];
-  const points = rises.map((rise, index) => `${((index / (rises.length - 1)) * w).toFixed(1)} ${(rise * h).toFixed(1)}`);
-  const path = `M${points.join(" L")}`;
+/** A fine straight rule `w` design pixels long, centred on `cx`. */
+function rule(f: Frame, cx: number, name: string, w: number, paint: Paint, weight = 1.5, gap = 0): Block {
+  const h = 10 * f.unit;
+  return { h, gap: gap * f.unit, draw: (y) => f.add("shape", name, cx - (w * f.unit) / 2, y, w * f.unit, h, { shape: "line", fill: paint, strokeWidth: weight }) };
+}
+
+/** A rule down the frame, for the seam between two columns. */
+function upright(f: Frame, name: string, x: number, top: number, bottom: number, paint: Paint, opacity = 1): void {
+  f.add("shape", name, x - 0.75 * f.unit, top, 1.5 * f.unit, bottom - top, { shape: "rect", fill: paint, opacity });
+}
+
+interface CameoStyle {
+  /** A solid rim round the photo, and how thick it is. */
+  rim?: Paint;
+  rimWidth?: number;
+  /** A drawing round it, `scale` times as wide as the photo. */
+  halo?: Art;
+  scale?: number;
+  haloColor?: Paint;
+  loop?: Style["loop"];
+}
+
+/** How much height a cameo of a photo `d` design pixels across takes, its rim and its drawing included. */
+function cameoHeight(f: Frame, d: number, style: CameoStyle): number {
+  const rim = d + (style.rimWidth ?? 6) * 2 * (style.rim ? 1 : 0);
+  const halo = style.halo ? d * (style.scale ?? 1.36) * (style.halo.h / style.halo.w) : 0;
+  return Math.max(rim, halo) * f.unit;
+}
+
+/** The speaker's photo framed as a cameo centred on a point: the drawing round it first, then its rim, then the photo,
+ *  all turning slowly together when they loop. */
+function cameoAt(f: Frame, cx: number, cy: number, d: number, style: CameoStyle): void {
+  const side = d * f.unit;
+  const motion: Style = style.loop ? { loop: style.loop } : {};
+  if (style.halo) {
+    const w = side * (style.scale ?? 1.36);
+    const h = (w * style.halo.h) / style.halo.w;
+    f.add("graphic", "halo", cx - w / 2, cy - h / 2, w, h, { art: style.halo, color: style.haloColor ?? GOLD, ...motion });
+  }
+  if (style.rim) {
+    const r = side / 2 + (style.rimWidth ?? 6) * f.unit;
+    f.add("shape", "rim", cx - r, cy - r, r * 2, r * 2, { shape: "ellipse", fill: style.rim, ...motion });
+  }
+  f.add("avatar", "main", cx - side / 2, cy - side / 2, side, side, motion);
+}
+
+function cameo(f: Frame, cx: number, d: number, style: CameoStyle, gap = 0): Block {
+  const h = cameoHeight(f, d, style);
+  return { h, gap: gap * f.unit, draw: (y) => cameoAt(f, cx, y + h / 2, d, style) };
+}
+
+/** The speaker's name and handle, one over the other. */
+function names(f: Frame, c: Column, name: Style, handle: Style | null, gap = 0): Block {
+  const nameH = f.lines(name.size ?? 30, 1, 1.35);
+  const handleH = handle ? f.lines(handle.size ?? 22, 1, 1.35) : 0;
   return {
-    w,
-    h,
-    paths: [
-      { d: `${path} L${w} ${h} L0 ${h} Z`, fill: ground },
-      { d: path, stroke: line, width: 3 },
-    ],
+    h: nameH + handleH,
+    gap: gap * f.unit,
+    draw: (y) => {
+      f.add("name", "main", c.x, y, c.w, nameH, { align: "center", ...name });
+      if (handle) f.add("handle", "main", c.x, y + nameH, c.w, handleH, { align: "center", ...handle });
+    },
   };
 }
 
-/** A dark studio card: an on-air light, the speaker and the show up top, captions in the middle, a mint meter below. */
-const studioDark = template("studio-dark", "Studio Dark", { color: "#1c1e23", to: "#0b0c0e", angle: 180 }, INK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const text = "#f5f5f4";
-  const soft = "#8b9099";
-  const mint = "#2ff0b8";
-  const inset = P * 0.5;
-  const left = P * 1.2;
-  const right = W - P * 1.2;
-  const top = f.tall ? H * 0.09 : P * 1.2;
-  const bottom = f.tall ? H * 0.86 : H - P * 1.2;
-  const column = f.wide ? W * 0.34 : right - left;
-  f.add("shape", "card", inset, inset, W - inset * 2, H - inset * 2, { shape: "rect", fill: "#15171b", radius: 0.035, stroke: "#2a2d34", strokeWidth: 2 });
-
-  const lightH = 48 * u;
-  f.add("shape", "air", left, top, 168 * u, lightH, { shape: "rect", radius: 0.5, fill: "#2b1619" });
-  f.add("shape", "light", left + 20 * u, top + lightH / 2 - 7 * u, 14 * u, 14 * u, { shape: "ellipse", fill: "#ff4d4d", loop: "pulse" });
-  f.add("text", "air", left + 46 * u, capsTop(f, top + lightH / 2, 22), 112 * u, f.lines(22), { text: "On air", font: MONO, size: 22, weight: 700, color: "#ff6b6b", uppercase: true, letterSpacing: 160 });
-  f.add("text", "episode", right - 320 * u, capsTop(f, top + lightH / 2, 22), 320 * u, f.lines(22), { text: "Episode 12", font: MONO, size: 22, weight: 600, color: soft, align: "right", uppercase: true, letterSpacing: 160 });
-
-  const bylineY = top + lightH + 56 * u;
-  byline(f, left, bylineY, 112 * u, column, { font: "Inter Variable", size: 44, weight: 700, color: text }, { font: "Inter Variable", size: 30, weight: 500, color: soft });
-  const titleSize = f.wide ? 60 : 54;
-  const titleY = bylineY + 112 * u + 40 * u;
-  const titleH = f.lines(titleSize, f.wide ? 3 : 2);
-  f.add("title", "main", left, titleY, column, titleH, { font: "Inter Variable", size: titleSize, weight: 750, color: text, lineHeight: 1.15, enter: "rise" });
-
-  const footY = bottom - 34 * u;
-  f.add("links", "main", left, footY, column, 34 * u, { font: MONO, size: 22, weight: 500, color: "#6b7079", align: "left" });
-  f.add("time", "main", right - 300 * u, footY, 300 * u, 34 * u, { font: MONO, size: 22, weight: 500, color: soft, align: "right" });
-
-  const captions = { font: "Inter Variable", size: f.by({ square: 60, portrait: 72, story: 82, landscape: 68 }), weight: 800, color: "#ffffff", highlight: mint, align: "left" as const };
-  if (f.wide) {
-    const x = left + column + P * 1.2;
-    f.add("shape", "divider", left + column + P * 0.6, top, 2 * u, bottom - top, { shape: "rect", fill: "#2a2d34" });
-    const visualH = H * 0.16;
-    const visualY = footY - 36 * u - visualH;
-    f.add("captions", "main", x, top + lightH + 40 * u, right - x, visualY - 40 * u - (top + lightH + 40 * u), captions);
-    f.add("visual", "main", x, visualY, right - x, visualH, { visual: "bars", color: mint });
-    return;
-  }
-  const visualH = H * 0.12;
-  const visualY = footY - 36 * u - visualH;
-  const captionsY = titleY + titleH + 40 * u;
-  f.add("captions", "main", left, captionsY, right - left, visualY - 36 * u - captionsY, captions);
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "bars", color: mint });
-});
-
-/** A clean white card on pale grey: blue for the episode, the word being said and the sound. */
-const cleanWhite = template("clean-white", "Clean White", { color: "#eceff3" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const ink = "#0f172a";
-  const soft = "#64748b";
-  const blue = "#2563eb";
-  const font = "DM Sans Variable";
-  const inset = P * 0.6;
-  const left = P * 1.4;
-  const right = W - P * 1.4;
-  const top = f.tall ? H * 0.1 : P * 1.4;
-  const bottom = f.tall ? H * 0.85 : H - P * 1.4;
-  const column = f.wide ? W * 0.36 : right - left;
-  f.add("shape", "card", inset, inset, W - inset * 2, H - inset * 2, { shape: "rect", fill: "#ffffff", radius: 0.04, stroke: "#dfe4ea", strokeWidth: 2 });
-
-  f.add("text", "episode", left, top, column, f.lines(24), { text: "Episode 12", font, size: 24, weight: 700, color: blue, uppercase: true, letterSpacing: 140 });
-  const titleSize = f.by({ square: 50, portrait: 58, story: 64, landscape: 62 });
-  const titleY = top + 48 * u;
-  const titleH = f.lines(titleSize, f.wide ? 3 : 2, 1.1);
-  f.add("title", "main", left, titleY, column, titleH, { font, size: titleSize, weight: 700, color: ink, lineHeight: 1.1, letterSpacing: -10 });
-
-  const side = 88 * u;
-  const rowY = bottom - side;
-  const listenW = monoWidth(f, "Listen now", 22, 140) + 52 * u;
-  byline(f, left, rowY, side, column - (f.wide ? 0 : listenW + 24 * u), { font, size: 34, weight: 700, color: ink }, { font, size: 26, weight: 500, color: soft });
-  pill(f, "listen", right - listenW, rowY + side / 2 - 26 * u, "Listen now", { size: 22, height: 52, fill: blue, color: "#ffffff" });
-
-  const captions = { font, size: f.by({ square: 58, portrait: 68, story: 78, landscape: 66 }), weight: 700, color: ink, highlight: blue, align: "left" as const };
-  const x = f.wide ? left + column + P * 1.2 : left;
-  const ruleY = f.wide ? top : titleY + titleH + 36 * u;
-  if (f.wide) f.add("shape", "rule", left + column + P * 0.6, top, 2 * u, bottom - top, { shape: "rect", fill: "#e2e8f0" });
-  else f.add("shape", "rule", left, ruleY, right - left, 4 * u, { shape: "line", fill: "#e2e8f0", strokeWidth: 2 });
-  const timeY = (f.wide ? rowY : rowY - 48 * u) - 30 * u;
-  const visualH = H * (f.wide ? 0.14 : 0.1);
-  const visualY = timeY - 10 * u - visualH;
-  const captionsY = f.wide ? top : ruleY + 36 * u;
-  f.add("captions", "main", x, captionsY, right - x, visualY - 32 * u - captionsY, captions);
-  f.add("visual", "main", x, visualY, right - x, visualH, { visual: "bars", color: blue });
-  f.add("time", "main", f.wide ? x : right - 300 * u, timeY, f.wide ? 300 * u : 300 * u, 30 * u, { font, size: 22, weight: 600, color: soft, align: f.wide ? "left" : "right" });
-});
-
-/** Captions as the whole picture: huge white capitals on black, the word being said lit yellow. */
-const bigCaptions = template("big-captions", "Bold Captions", { color: "#0c0c0c" }, INK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const yellow = "#ffd400";
-  const grey = "#8a8a8a";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.84 : H - P;
-  const side = 88 * u;
-  byline(f, left, top, side, (right - left) * 0.62, { font: "Inter Variable", size: 34, weight: 700, color: "#ffffff" }, { font: "Inter Variable", size: 26, weight: 500, color: grey });
-  f.add("text", "tag", right - 360 * u, capsTop(f, top + side / 2, 26), 354 * u, f.lines(26), {
-    text: "Hot take", font: "Archivo Black", size: 26, weight: 400, color: "#0c0c0c", background: yellow, align: "right", uppercase: true, letterSpacing: 40, enter: "pop",
-  });
-
-  const footY = bottom - 34 * u;
-  f.add("title", "main", left, footY - 4 * u, (right - left) * 0.68, f.lines(26), { font: "Inter Variable", size: 26, weight: 600, color: grey });
-  f.add("time", "main", right - 260 * u, footY, 260 * u, 34 * u, { font: "Inter Variable", size: 24, weight: 600, color: grey, align: "right" });
-  const visualH = f.by({ square: 90, portrait: 120, story: 150, landscape: 100 }) * u;
-  const visualY = footY - 32 * u - visualH;
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "wave", color: yellow });
-  const captionsY = top + side + 48 * u;
-  f.add("captions", "main", left, captionsY, right - left, visualY - 40 * u - captionsY, {
-    font: "Archivo Black", size: f.by({ square: 90, portrait: 100, story: 110, landscape: 96 }), weight: 400, color: "#ffffff", highlight: yellow, align: "center", uppercase: true,
-  });
-});
-
-/** A pull quote: a giant orange quotation mark over warm paper, the words set in a display serif. */
-const boldQuote = template("bold-quote", "Bold Quote", { color: "#f3ece1" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const ink = "#1d1a16";
-  const soft = "#7a7268";
-  const orange = "#ff5a1f";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.84 : H - P;
-  // 400 is the largest size the editor keeps.
-  const markSize = f.by({ square: 340, portrait: 400, story: 400, landscape: 340 });
-  f.add("text", "mark", left - markSize * 0.04 * u, top - markSize * 0.12 * u, markSize * 0.6 * u, markSize * 0.62 * u, { text: "“", font: "DM Serif Display", size: markSize, weight: 400, color: orange, lineHeight: 1 });
-  f.add("title", "main", right - (right - left) * 0.55, top, (right - left) * 0.55, f.lines(22, 2, 1.4), { font: "Inter Variable", size: 22, weight: 600, color: soft, align: "right", uppercase: true, letterSpacing: 160, lineHeight: 1.4 });
-
-  const side = 96 * u;
-  const bylineY = bottom - side;
-  byline(f, left, bylineY, side, (right - left) * 0.6, { font: "Inter Variable", size: 34, weight: 700, color: ink }, { font: "Inter Variable", size: 26, weight: 500, color: soft });
-  const visualW = (f.wide ? 420 : 300) * u;
-  f.add("visual", "main", right - visualW, bylineY + 4 * u, visualW, 64 * u, { visual: "bars", color: ink });
-  f.add("time", "main", right - visualW, bylineY + 70 * u, visualW, 26 * u, { font: "Inter Variable", size: 20, weight: 600, color: soft, align: "right" });
-  const ruleY = bylineY - 48 * u;
-  f.add("shape", "rule", left, ruleY, 72 * u, 6 * u, { shape: "line", fill: orange, strokeWidth: 6 });
-
-  const captionsY = top + markSize * 0.42 * u;
-  f.add("captions", "main", left, captionsY, (right - left) * (f.wide ? 0.86 : 1), ruleY - 32 * u - captionsY, {
-    font: "DM Serif Display", size: f.by({ square: 76, portrait: 90, story: 100, landscape: 84 }), weight: 400, color: ink, highlight: orange, align: "left",
-  });
-});
-
-/** Late-night radio in neon: a glowing sign, a cyan-edged panel for the words, magenta for the word being said. */
-const neonNight = template("neon-night", "Neon Night", { color: "#0a0420", to: "#250a4d", angle: 160 }, DUSK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const pink = "#ff2bd6";
-  const cyan = "#00e5ff";
-  const lilac = "#b9a6ff";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.1 : P * 0.9;
-  const bottom = f.tall ? H * 0.84 : H - P;
-  const signSize = f.by({ square: 84, portrait: 92, story: 100, landscape: 96 });
-  f.add("text", "sign", left, top, right - left, f.lines(signSize, 1, 1.1), { text: "Late night", font: "Monoton", size: signSize, weight: 400, color: pink, align: "center", uppercase: true, effect: "neon", lineHeight: 1.1, loop: "pulse", speed: 0.5 });
-  const titleY = top + f.lines(signSize, 1, 1.1) + 20 * u;
-  f.add("title", "main", left, titleY, right - left, f.lines(26), { font: "Outfit Variable", size: 26, weight: 600, color: lilac, align: "center", uppercase: true, letterSpacing: 240 });
-
-  const side = 88 * u;
-  const rowY = bottom - side;
-  ring(f, left, rowY, side, 5, pink);
-  byline(f, left, rowY, side, (right - left) * 0.7, { font: "Outfit Variable", size: 36, weight: 600, color: "#ffffff" }, { font: "Outfit Variable", size: 26, weight: 400, color: lilac });
-  f.add("time", "main", right - 260 * u, rowY + side / 2 - 17 * u, 260 * u, 34 * u, { font: MONO, size: 24, weight: 600, color: cyan, align: "right" });
-
-  const panelY = titleY + f.lines(26) + 44 * u;
-  const panelH = rowY - 48 * u - panelY;
-  f.add("shape", "panel", left, panelY, right - left, panelH, { shape: "rect", fill: "#12082e", radius: 0.06, stroke: cyan, strokeWidth: 3 });
-  const inner = 44 * u;
-  const visualH = Math.min(panelH * 0.26, 150 * u);
-  const visualY = panelY + panelH - inner - visualH;
-  f.add("visual", "main", left + inner, visualY, right - left - inner * 2, visualH, { visual: "bars", color: cyan });
-  f.add("captions", "main", left + inner, panelY + inner, right - left - inner * 2, visualY - 24 * u - panelY - inner, {
-    font: "Outfit Variable", size: f.by({ square: 60, portrait: 68, story: 78, landscape: 70 }), weight: 700, color: "#ffffff", highlight: pink, align: "center", effect: "neon",
-  });
-});
-
-/** A sunrise: a violet sky warming to coral, a half sun on the horizon, and the sound rippling under it. */
-const sunrise = template("sunrise", "Sunrise Glow", { color: "#2a1b5c", to: "#f2875e", angle: 180 }, DUSK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const peach = "#ffd9a8";
-  const sun = "#ffc46b";
-  const font = "Poppins";
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const captions = { font, size: f.by({ square: 58, portrait: 64, story: 74, landscape: 64 }), weight: 700, color: "#ffffff", highlight: sun };
-
-  if (f.wide) {
-    const left = P;
-    const column = W * 0.46;
-    f.add("title", "main", left, top, column, f.lines(24), { font, size: 24, weight: 700, color: peach, uppercase: true, letterSpacing: 220 });
-    const side = 104 * u;
-    ring(f, left, top + 64 * u, side, 6, sun);
-    byline(f, left, top + 64 * u, side, column, { font, size: 38, weight: 700, color: "#ffffff" }, { font, size: 26, weight: 400, color: peach });
-    const captionsY = top + 64 * u + side + 48 * u;
-    f.add("captions", "main", left, captionsY, column, bottom - captionsY, { ...captions, align: "left" });
-    const sunW = W * 0.34;
-    const centre = W * 0.74;
-    const horizonY = H * 0.62;
-    f.add("shape", "sun", centre - sunW / 2, horizonY - sunW / 2, sunW, sunW / 2, { shape: "arch", fill: sun, enter: "rise" });
-    f.add("shape", "horizon", W * 0.54, horizonY, W * 0.4, 4 * u, { shape: "line", fill: peach, strokeWidth: 3 });
-    f.add("visual", "main", W * 0.56, horizonY + 32 * u, W * 0.36, 120 * u, { visual: "bars", color: "#fff1e0", opacity: 0.9 });
-    f.add("time", "main", W * 0.56, horizonY + 172 * u, W * 0.36, 32 * u, { font, size: 24, weight: 400, color: "#fff1e0", align: "center" });
-    return;
-  }
-
-  const left = P;
-  const right = W - P;
-  f.add("title", "main", left, top, right - left, f.lines(24), { font, size: 24, weight: 700, color: peach, align: "center", uppercase: true, letterSpacing: 220 });
-  const side = f.by({ square: 96, portrait: 120, story: 140, landscape: 120 }) * u;
-  const avatarY = top + 64 * u;
-  ring(f, W / 2 - side / 2, avatarY, side, 6, sun);
-  f.add("avatar", "main", W / 2 - side / 2, avatarY, side, side);
-  f.add("name", "main", left, avatarY + side + 18 * u, right - left, f.lines(38, 1, 1.3), { font, size: 38, weight: 700, color: "#ffffff", align: "center" });
-  f.add("handle", "main", left, avatarY + side + 18 * u + f.lines(38, 1, 1.3), right - left, f.lines(26, 1, 1.3), { font, size: 26, weight: 400, color: peach, align: "center" });
-
-  const timeY = bottom - 32 * u;
-  f.add("time", "main", left, timeY, right - left, 32 * u, { font, size: 24, weight: 400, color: "#fff1e0", align: "center" });
-  const visualH = f.by({ square: 64, portrait: 90, story: 120, landscape: 90 }) * u;
-  const visualY = timeY - 16 * u - visualH;
-  f.add("visual", "main", left + 60 * u, visualY, right - left - 120 * u, visualH, { visual: "bars", color: "#fff1e0", opacity: 0.9 });
-  const horizonY = visualY - 24 * u;
-  f.add("shape", "horizon", left, horizonY, right - left, 4 * u, { shape: "line", fill: peach, strokeWidth: 3 });
-  const sunW = W * f.by({ square: 0.36, portrait: 0.48, story: 0.62, landscape: 0.5 });
-  f.add("shape", "sun", W / 2 - sunW / 2, horizonY - sunW / 2 + 2 * u, sunW, sunW / 2, { shape: "arch", fill: sun, enter: "rise" });
-  const captionsY = avatarY + side + 18 * u + f.lines(38, 1, 1.3) + f.lines(26, 1, 1.3) + 36 * u;
-  f.add("captions", "main", left, captionsY, right - left, horizonY - sunW / 2 - 28 * u - captionsY, { ...captions, align: "center" });
-});
-
-/** A news desk: a photo up top, a red and white lower third with the speaker's name, and a ticker along the foot. */
-const newsroom = template("newsroom", "Newsroom Lower Third", { color: "#0f1216" }, INK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const red = "#d62839";
-  const ink = "#0f1216";
-  const font = "Inter Variable";
-  const tickerH = 68 * u;
-  const tickerY = f.tall ? H * 0.84 : H - tickerH;
-  const photoW = f.wide ? W * 0.6 : W;
-  const photoH = f.wide ? tickerY : H * f.by({ square: 0.5, portrait: 0.52, story: 0.46, landscape: 1 });
-  const photoY = f.tall ? H * 0.06 : 0;
-  // The painter clips a picture to its box only when the frame has a mask, so a plain photo frame is masked as a rect.
-  f.add("image", "photo", 0, photoY, photoW, photoH, { mask: "rect" });
-
-  const edge = P * 0.6;
-  f.add("text", "live", edge + 8 * u, photoY + edge, 120 * u, f.lines(28), { text: "Live", font: "Oswald Variable", size: 28, weight: 600, color: "#ffffff", background: red, uppercase: true, letterSpacing: 120, loop: "pulse", speed: 0.5 });
-  f.add("time", "main", edge + 112 * u, photoY + edge - 3 * u, 220 * u, 38 * u, { font: "Oswald Variable", size: 26, weight: 500, color: "#ffffff", background: ink, align: "left" });
-
-  // The lower third sits across the photo's foot, the avatar overlapping its left end.
-  const side = 132 * u;
-  const barsX = edge + side + 24 * u;
-  const barsW = photoW - edge - barsX;
-  const nameBarY = photoY + photoH - (f.wide ? 150 : 96) * u;
-  ring(f, edge, nameBarY - 6 * u, side, 6, "#ffffff");
-  f.add("avatar", "main", edge, nameBarY - 6 * u, side, side);
-  f.add("shape", "namebar", barsX, nameBarY, barsW, 64 * u, { shape: "rect", fill: red, enter: "wipe" });
-  f.add("name", "main", barsX + 22 * u, nameBarY, barsW - 44 * u, 64 * u, { font: "Oswald Variable", size: 38, weight: 600, color: "#ffffff", uppercase: true, letterSpacing: 40, align: "left" });
-  f.add("shape", "handlebar", barsX, nameBarY + 64 * u, barsW, 48 * u, { shape: "rect", fill: "#ffffff", enter: "wipe" });
-  f.add("handle", "main", barsX + 22 * u, nameBarY + 64 * u, barsW * 0.45, 48 * u, { font, size: 24, weight: 700, color: ink, align: "left" });
-  f.add("title", "main", barsX + barsW * 0.45, nameBarY + 64 * u + 24 * u - f.lines(20) / 2, barsW * 0.55 - 22 * u, f.lines(20), { font, size: 20, weight: 600, color: "#5b636d", align: "right", uppercase: true, letterSpacing: 60 });
-
-  const captionsX = f.wide ? photoW + P * 0.8 : P;
-  const captionsY = f.wide ? P : photoY + photoH + 64 * u;
-  f.add("captions", "main", captionsX, captionsY, W - P * (f.wide ? 0.8 : 1) - captionsX, tickerY - 40 * u - captionsY, {
-    font, size: f.by({ square: 54, portrait: 60, story: 70, landscape: 58 }), weight: 800, color: "#ffffff", highlight: red, align: "left",
-  });
-
-  f.add("shape", "ticker", 0, tickerY, W, tickerH, { shape: "rect", fill: "#1b2027" });
-  f.add("shape", "next", 0, tickerY, 170 * u, tickerH, { shape: "rect", fill: red });
-  f.add("text", "next", 0, capsTop(f, tickerY + tickerH / 2, 26), 170 * u, f.lines(26), { text: "Up next", font: "Oswald Variable", size: 26, weight: 600, color: "#ffffff", align: "center", uppercase: true, letterSpacing: 80 });
-  const visualW = 150 * u;
-  f.add("text", "ticker", 200 * u, capsTop(f, tickerY + tickerH / 2, 24), W - 200 * u - visualW - 56 * u, f.lines(24), { text: "Rate cuts, hiring, and what founders should do next", font, size: 24, weight: 500, color: "#d0d5db" });
-  f.add("visual", "main", W - visualW - 28 * u, tickerY + 16 * u, visualW, tickerH - 32 * u, { visual: "bars", color: "#ffffff" });
-});
-
-/** Black on warm grey in monospace: crop marks, hairline rules and a recording light, nothing more. */
-const minimalMono = template("minimal-mono", "Minimal Mono", { color: "#ecebe6" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const ink = "#111111";
-  const grey = "#77756f";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const mark = { text: "+", font: "Space Mono", size: 32, weight: 400, color: grey, lineHeight: 1 } as const;
-  const corner = P * 0.32;
-  f.add("text", "mark-tl", corner, corner, 40 * u, 40 * u, mark);
-  f.add("text", "mark-tr", W - corner - 40 * u, corner, 40 * u, 40 * u, { ...mark, align: "right" });
-  f.add("text", "mark-bl", corner, H - corner - 40 * u, 40 * u, 40 * u, mark);
-  f.add("text", "mark-br", W - corner - 40 * u, H - corner - 40 * u, 40 * u, 40 * u, { ...mark, align: "right" });
-
-  const rowMiddle = top + 16 * u;
-  f.add("shape", "rec", left, rowMiddle - 7 * u, 14 * u, 14 * u, { shape: "ellipse", fill: "#e5484d", loop: "pulse" });
-  f.add("text", "rec", left + 28 * u, capsTop(f, rowMiddle, 22), 360 * u, f.lines(22), { text: "Rec  Ep.012", font: MONO, size: 22, weight: 600, color: ink, uppercase: true, letterSpacing: 120 });
-  f.add("time", "main", right - 300 * u, rowMiddle - 16 * u, 300 * u, 32 * u, { font: MONO, size: 22, weight: 500, color: ink, align: "right" });
-  const ruleY = top + 52 * u;
-  f.add("shape", "rule-top", left, ruleY, right - left, 2 * u, { shape: "line", fill: ink, strokeWidth: 2 });
-
-  const titleSize = f.by({ square: 42, portrait: 46, story: 52, landscape: 46 });
-  const titleY = ruleY + 40 * u;
-  const titleH = f.lines(titleSize, 2, 1.2);
-  f.add("title", "main", left, titleY, (right - left) * (f.wide ? 0.6 : 1), titleH, { font: "Space Mono", size: titleSize, weight: 700, color: ink, lineHeight: 1.2, enter: "typewriter" });
-
-  const side = 72 * u;
-  const footY = bottom - side;
-  byline(f, left, footY, side, (right - left) * 0.6, { font: MONO, size: 28, weight: 700, color: ink }, { font: MONO, size: 22, weight: 400, color: grey });
-  f.add("links", "main", right - (right - left) * 0.4, footY + side / 2 - 16 * u, (right - left) * 0.4, 32 * u, { font: MONO, size: 20, weight: 500, color: grey, align: "right" });
-  const lowRuleY = footY - 32 * u;
-  f.add("shape", "rule-low", left, lowRuleY, right - left, 2 * u, { shape: "line", fill: ink, strokeWidth: 2 });
-  const visualH = H * f.by({ square: 0.08, portrait: 0.09, story: 0.08, landscape: 0.1 });
-  const visualY = lowRuleY - 32 * u - visualH;
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "wave", color: ink });
-  const captionsY = titleY + titleH + 40 * u;
-  f.add("captions", "main", left, captionsY, right - left, visualY - 32 * u - captionsY, {
-    font: MONO, size: f.by({ square: 52, portrait: 58, story: 66, landscape: 56 }), weight: 600, color: ink, highlight: ink, align: "left",
-  });
-});
-
-/** An old valve radio: a walnut page, a cream tuning dial with the sound in it, and a slab serif for the words. */
-const retroRadio = template("retro-radio", "Retro Radio", { color: "#2b1911", to: "#170d08", angle: 180 }, EMBER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const cream = "#f6e7cc";
-  const orange = "#ff8a3d";
-  const brown = "#5a3a22";
-  const soft = "#d19c8c";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.09 : P * 0.8;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const signSize = f.by({ square: 80, portrait: 90, story: 100, landscape: 84 });
-  const signH = f.lines(signSize, 1, 1.6);
-  f.add("text", "sign", left, top, right - left, signH, { text: "On the air", font: "Shrikhand", size: signSize, weight: 400, color: orange, align: "center", curve: 10, effect: "lift" });
-  const titleY = top + signH + 4 * u;
-  f.add("title", "main", left, titleY, right - left, f.lines(24), { font: "Roboto Slab Variable", size: 24, weight: 600, color: cream, align: "center", uppercase: true, letterSpacing: 200 });
-
-  const dialY = titleY + f.lines(24) + 36 * u;
-  const dialH = f.by({ square: 180, portrait: 240, story: 280, landscape: 200 }) * u;
-  const dialX = f.wide ? W * 0.2 : left;
-  const dialW = f.wide ? W * 0.6 : right - left;
-  f.add("shape", "dial", dialX, dialY, dialW, dialH, { shape: "rect", fill: "#f3e3c3", radius: 0.12, stroke: "#c9a66b", strokeWidth: 6 });
-  // Each frequency is its own layer: the painter folds runs of spaces, so one line of them couldn't be spread out.
-  const band = dialW - 80 * u;
-  ["88", "92", "96", "100", "104", "108"].forEach((mark, index, marks) => {
-    const centre = dialX + 40 * u + (band * index) / (marks.length - 1);
-    f.add("text", `band-${mark}`, centre - 40 * u, dialY + 22 * u, 80 * u, f.lines(22), { text: mark, font: "Space Mono", size: 22, weight: 700, color: brown, align: "center" });
-  });
-  f.add("shape", "ticks", dialX + 40 * u, dialY + 58 * u, dialW - 80 * u, 10 * u, { shape: "line", fill: brown, strokeWidth: 6, dash: "dotted" });
-  f.add("visual", "main", dialX + 40 * u, dialY + 82 * u, dialW - 80 * u, dialH - 104 * u, { visual: "bars", color: brown });
-  f.add("shape", "needle", dialX + dialW * 0.62, dialY + 14 * u, 6 * u, dialH - 28 * u, { shape: "rect", fill: "#e4572e", loop: "wiggle", speed: 0.4 });
-
-  const side = 96 * u;
-  const rowY = bottom - side;
-  ring(f, left, rowY, side, 6, orange);
-  byline(f, left, rowY, side, (right - left) * 0.7, { font: "Roboto Slab Variable", size: 36, weight: 700, color: cream }, { font: "Space Mono", size: 22, weight: 400, color: soft });
-  f.add("time", "main", right - 260 * u, rowY + side / 2 - 16 * u, 260 * u, 32 * u, { font: "Space Mono", size: 22, weight: 400, color: soft, align: "right" });
-  const captionsY = dialY + dialH + 44 * u;
-  f.add("captions", "main", left, captionsY, right - left, rowY - 40 * u - captionsY, {
-    font: "Roboto Slab Variable", size: f.by({ square: 56, portrait: 68, story: 78, landscape: 64 }), weight: 700, color: cream, highlight: orange, align: "center",
-  });
-});
-
-/** Half photo, half plum: the speaker's picture fills one side, the words and the sound the other. */
-const splitPhoto = template("split-photo", "Split Photo", { color: "#2a1b3d" }, DUSK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const peach = "#ffb38a";
-  const cream = "#fff4ec";
-  const lilac = "#c7b5e0";
-  const font = "Bricolage Grotesque Variable";
-  const side = 132 * u;
-  const captions = { font, size: f.by({ square: 54, portrait: 60, story: 70, landscape: 60 }), weight: 700, color: cream, highlight: peach, align: "left" as const };
-  const label = { text: "Episode 12", font, size: 24, weight: 700, color: "#2a1b3d", background: peach, uppercase: true, letterSpacing: 120 } as const;
-
-  if (f.wide) {
-    const splitX = W * 0.46;
-    f.add("image", "photo", 0, 0, splitX, H, { mask: "rect" });
-    f.add("text", "episode", P * 0.75, P * 0.75, 300 * u, f.lines(24), label);
-    const left = splitX + P;
-    const right = W - P;
-    byline(f, left, P, 104 * u, right - left, { font, size: 38, weight: 700, color: cream }, { font, size: 26, weight: 500, color: lilac });
-    const titleY = P + 104 * u + 36 * u;
-    f.add("title", "main", left, titleY, right - left, f.lines(52, 2, 1.1), { font, size: 52, weight: 800, color: peach, lineHeight: 1.1 });
-    const timeY = H - P - 30 * u;
-    f.add("time", "main", left, timeY, right - left, 30 * u, { font, size: 22, weight: 500, color: lilac, align: "right" });
-    const visualY = timeY - 12 * u - 110 * u;
-    f.add("visual", "main", left, visualY, right - left, 110 * u, { visual: "bars", color: peach });
-    const captionsY = titleY + f.lines(52, 2, 1.1) + 32 * u;
-    f.add("captions", "main", left, captionsY, right - left, visualY - 32 * u - captionsY, captions);
-    return;
-  }
-
-  const left = P;
-  const right = W - P;
-  const splitY = H * f.by({ square: 0.4, portrait: 0.44, story: 0.42, landscape: 0.44 });
-  f.add("image", "photo", 0, 0, W, splitY, { mask: "rect" });
-  f.add("shape", "seam", 0, splitY, W, 8 * u, { shape: "rect", fill: peach });
-  f.add("text", "episode", left, f.tall ? H * 0.08 : P * 0.75, 300 * u, f.lines(24), label);
-  ring(f, left, splitY - side / 2, side, 8, peach);
-  f.add("avatar", "main", left, splitY - side / 2, side, side);
-  const nameX = left + side + 28 * u;
-  f.add("name", "main", nameX, splitY + 16 * u, right - nameX, f.lines(38, 1, 1.3), { font, size: 38, weight: 700, color: cream, align: "left" });
-  f.add("handle", "main", nameX, splitY + 16 * u + f.lines(38, 1, 1.3), right - nameX, f.lines(26, 1, 1.3), { font, size: 26, weight: 500, color: lilac, align: "left" });
-  const titleSize = f.by({ square: 44, portrait: 48, story: 56, landscape: 48 });
-  const titleY = splitY + side / 2 + 40 * u;
-  f.add("title", "main", left, titleY, right - left, f.lines(titleSize, 2, 1.1), { font, size: titleSize, weight: 800, color: peach, lineHeight: 1.1 });
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const timeY = bottom - 30 * u;
-  f.add("time", "main", left, timeY, right - left, 30 * u, { font, size: 22, weight: 500, color: lilac, align: "right" });
-  const visualH = f.by({ square: 72, portrait: 96, story: 130, landscape: 96 }) * u;
-  const visualY = timeY - 10 * u - visualH;
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "bars", color: peach });
-  const captionsY = titleY + f.lines(titleSize, 2, 1.1) + 28 * u;
-  f.add("captions", "main", left, captionsY, right - left, visualY - 24 * u - captionsY, captions);
-});
-
-/** An interview: two arched photo frames side by side, host and guest named under them, a pulse between. */
-const twoGuests = template("two-guests", "Two Guests", { color: "#ece8f6" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const purple = "#5b3cc4";
-  const ink = "#1b1530";
-  const soft = "#6d6585";
-  const font = "Space Grotesk Variable";
-  const top = f.tall ? H * 0.09 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const gap = 32 * u;
-  const role = { font, size: 20, weight: 700, color: purple, align: "center" as const, uppercase: true, letterSpacing: 220 };
-
-  // Two arched frames, each with its role and its person's name under it.
-  const guests = (x: number, y: number, w: number, h: number) => {
-    const frameW = (w - gap) / 2;
-    f.add("image", "host", x, y, frameW, h, { mask: "arch" });
-    f.add("image", "guest", x + frameW + gap, y, frameW, h, { mask: "arch" });
-    const pulse = 120 * u;
-    f.add("visual", "main", x + w / 2 - pulse / 2, y + h - pulse * 0.8, pulse, pulse, { visual: "pulse", color: purple });
-    const roleY = y + h + 22 * u;
-    const nameY = roleY + f.lines(20) + 6 * u;
-    f.add("text", "host", x, roleY, frameW, f.lines(20), { text: "Host", ...role });
-    f.add("text", "guest", x + frameW + gap, roleY, frameW, f.lines(20), { text: "Guest", ...role });
-    f.add("name", "main", x, nameY, frameW, f.lines(34, 1, 1.3), { font, size: 34, weight: 700, color: ink, align: "center" });
-    f.add("text", "guest-name", x + frameW + gap, nameY + (f.lines(34, 1, 1.3) - f.lines(34)) / 2, frameW, f.lines(34), { text: "Jordan Lee", font, size: 34, weight: 700, color: ink, align: "center" });
-    return nameY + f.lines(34, 1, 1.3);
+/** The photo with the name over the handle beside it, as one row `w` wide from `x`. */
+function byline(f: Frame, x: number, w: number, d: number, name: Style, handle: Style, frame: CameoStyle = {}, gap = 0): Block {
+  const h = cameoHeight(f, d, frame);
+  return {
+    h,
+    gap: gap * f.unit,
+    draw: (y) => {
+      cameoAt(f, x + h / 2, y + h / 2, d, frame);
+      const nameH = f.lines(name.size ?? 26, 1, 1.4);
+      const handleH = f.lines(handle.size ?? 22, 1, 1.3);
+      const top = y + (h - nameH - handleH) / 2;
+      const textX = x + h + 20 * f.unit;
+      f.add("name", "main", textX, top, x + w - textX, nameH, { ...name, align: "left" });
+      f.add("handle", "main", textX, top + nameH, x + w - textX, handleH, { ...handle, align: "left" });
+    },
   };
-  const captions = { font, size: f.by({ square: 50, portrait: 56, story: 66, landscape: 56 }), weight: 700, color: ink, highlight: purple };
-  const footY = bottom - 30 * u;
+}
+
+/** The captions, room for `count` lines; a flexible one also takes a share of the spare height. */
+function captions(f: Frame, c: Column, style: Style, count = 3, gap = 0, flex = 0): Block {
+  // A hair over the lines asked for, so the painter's count of the lines that fit never rounds one away.
+  const h = f.lines(style.size ?? 60, count + 0.1, style.lineHeight ?? 1.34);
+  return { h, gap: gap * f.unit, flex, draw: (y, height) => f.add("captions", "main", c.x, y, c.w, height, { align: "center", ...style }) };
+}
+
+/** The sound, `w` by `h` design pixels, centred on `cx`. */
+function sound(f: Frame, cx: number, w: number, h: number, style: Style, gap = 0): Block {
+  const width = w * f.unit;
+  return { h: h * f.unit, gap: gap * f.unit, draw: (y) => f.add("visual", "main", cx - width / 2, y, width, h * f.unit, { visual: "bars", ...style }) };
+}
+
+/** The time through the clip, on one line. */
+function clock(f: Frame, c: Column, style: Style, gap = 0): Block {
+  const h = f.lines(style.size ?? 20, 1, 1.4);
+  return { h, gap: gap * f.unit, draw: (y) => f.add("time", "main", c.x, y, c.w, h, { align: "center", ...style }) };
+}
+
+/** The links the user gave, on one line. */
+function links(f: Frame, c: Column, style: Style, gap = 0): Block {
+  const h = f.lines(style.size ?? 20, 1, 1.4);
+  return { h, gap: gap * f.unit, draw: (y) => f.add("links", "main", c.x, y, c.w, h, { align: "center", ...style }) };
+}
+
+/** A ruled border all round the frame, `inset` design pixels in from its edges. */
+function frameBorder(f: Frame, inset: number, style: BorderStyle, color: Paint, opacity = 1): void {
+  const i = inset * f.unit;
+  const w = f.width - i * 2;
+  const h = f.height - i * 2;
+  f.add("graphic", "border", i, i, w, h, { art: border(Math.round(w), Math.round(h), style), color, opacity });
+}
+
+/** A corner drawing in each corner of a box, turned over for each, `size` design pixels square. */
+function corners(f: Frame, art: Art, x: number, y: number, w: number, h: number, size: number, style: Style): void {
+  const s = size * f.unit;
+  f.add("graphic", "corner-tl", x, y, s, s, { art, ...style });
+  f.add("graphic", "corner-tr", x + w - s, y, s, s, { art, flipX: true, ...style });
+  f.add("graphic", "corner-bl", x, y + h - s, s, s, { art, flipY: true, ...style });
+  f.add("graphic", "corner-br", x + w - s, y + h - s, s, s, { art, flipX: true, flipY: true, ...style });
+}
+
+/** The column a stack runs down, the full width of the area or a share of it. */
+function columnOf(left: number, right: number): Column {
+  return { x: left, w: right - left };
+}
+
+/** A label on the left of a row and its partner on the right, sharing a line. */
+function pair(f: Frame, c: Column, ids: [string, string], texts: [string, string], style: Style, gap = 0): Block {
+  const h = f.lines(style.size ?? 20, 1, 1.25);
+  return {
+    h,
+    gap: gap * f.unit,
+    draw: (y) => {
+      f.add("text", ids[0], c.x, y, c.w / 2, h, { text: texts[0], align: "left", lineHeight: 1.25, ...style });
+      f.add("text", ids[1], c.x + c.w / 2, y, c.w / 2, h, { text: texts[1], align: "right", lineHeight: 1.25, ...style });
+    },
+  };
+}
+
+/** Navy and gold for a royal warrant: a crown over the speaker set in a cameo of beads, a stepped double border. */
+const royalCrest = template("royal-crest", "Royal Crest", { color: "#17284d", to: "#080f22", angle: 180 }, DUSK, (f) => {
+  const a = area(f);
+  const ivory = "#f3ead7";
+  const soft = "#9da9c6";
+  frameBorder(f, f.pad * 0.36, { gap: 12, outer: 2, inner: 1, corner: "step", cut: 30 }, GOLD, 0.9);
+  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: GOLD, uppercase: true, letterSpacing: 420, enter: "fade" };
+  const title: Style = { font: CINZEL, size: f.by({ square: 44, portrait: 52, story: 52, landscape: 54 }), weight: 600, color: GOLD, lineHeight: 1.14, letterSpacing: 30, enter: "glide", loop: "shimmer" };
+  const name: Style = { font: CINZEL, size: 28, weight: 600, color: ivory, letterSpacing: 80 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.28 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: beadRing(), scale: 1.34, loop: "slowZoom" };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
 
   if (f.wide) {
-    const left = P;
-    const half = W * 0.5;
-    guests(left, P, half - left, H - P * 2 - 100 * u);
-    const x = half + P * 0.75;
-    const right = W - P;
-    f.add("text", "label", x, P, right - x, f.lines(24), { text: "In conversation", font, size: 24, weight: 700, color: purple, uppercase: true, letterSpacing: 220 });
-    f.add("title", "main", x, P + 48 * u, right - x, f.lines(54, 2, 1.1), { font, size: 54, weight: 700, color: ink, lineHeight: 1.1 });
-    f.add("handle", "main", x, footY, (right - x) * 0.6, 30 * u, { font, size: 24, weight: 500, color: soft, align: "left" });
-    f.add("time", "main", right - 240 * u, footY, 240 * u, 30 * u, { font, size: 22, weight: 500, color: soft, align: "right" });
-    const captionsY = P + 48 * u + f.lines(54, 2, 1.1) + 40 * u;
-    f.add("captions", "main", x, captionsY, right - x, footY - 32 * u - captionsY, { ...captions, align: "left" });
+    const left = columnOf(a.left + 40, f.width * 0.38);
+    const right = columnOf(f.width * 0.44, a.right - 40);
+    stack(a.top, a.bottom, [ornament(f, left.x + left.w / 2, "crown", crown(), 150, { color: GOLD, enter: "fade" }), cameo(f, left.x + left.w / 2, 280, frame, 30), names(f, left, name, handle, 28)]);
+    upright(f, "seam", f.width * 0.41, a.top + 40, a.bottom - 40, GOLD, 0.55);
+    stack(a.top, a.bottom, [
+      label(f, right, "kicker", "Episode XII", kicker),
+      heading(f, right, title, 2, 18),
+      ornament(f, right.x + right.w / 2, "divider", divider(), 420, { color: GOLD }, 18),
+      space(), captions(f, right, words, 3, 18), space(),
+      sound(f, right.x + right.w / 2, 520, 70, { color: GOLD }, 18),
+      clock(f, right, time, 12),
+    ]);
     return;
   }
-
-  const left = P;
-  const right = W - P;
-  f.add("text", "label", left, top, right - left, f.lines(22), { text: "In conversation", font, size: 22, weight: 700, color: purple, align: "center", uppercase: true, letterSpacing: 220 });
-  const titleSize = f.by({ square: 42, portrait: 48, story: 56, landscape: 48 });
-  const titleLines = f.by({ square: 1, portrait: 2, story: 2, landscape: 2 });
-  const titleY = top + 44 * u;
-  f.add("title", "main", left, titleY, right - left, f.lines(titleSize, titleLines, 1.1), { font, size: titleSize, weight: 700, color: ink, align: "center", lineHeight: 1.1 });
-  const framesY = titleY + f.lines(titleSize, titleLines, 1.1) + 36 * u;
-  const frameH = ((right - left - gap) / 2) * f.by({ square: 0.78, portrait: 1.05, story: 1.35, landscape: 1 });
-  const namesEnd = guests(left, framesY, right - left, frameH);
-  f.add("handle", "main", left, footY, (right - left) * 0.6, 30 * u, { font, size: 24, weight: 500, color: soft, align: "left" });
-  f.add("time", "main", right - 240 * u, footY, 240 * u, 30 * u, { font, size: 22, weight: 500, color: soft, align: "right" });
-  const captionsY = namesEnd + 28 * u;
-  f.add("captions", "main", left, captionsY, right - left, footY - 24 * u - captionsY, { ...captions, align: "center" });
+  const c = columnOf(a.left + 20, a.right - 20);
+  stack(a.top, a.bottom, [
+    ornament(f, a.cx, "crown", crown(), f.by({ square: 104, portrait: 132, story: 168, landscape: 0 }), { color: GOLD, enter: "fade" }),
+    label(f, c, "kicker", "Episode XII", kicker, 18),
+    heading(f, c, title, 2, 12),
+    cameo(f, a.cx, f.by({ square: 112, portrait: 168, story: 236, landscape: 0 }), frame, f.by({ square: 22, portrait: 34, story: 52, landscape: 0 })),
+    names(f, c, name, handle, 18),
+    space(), captions(f, c, words, 3, f.by({ square: 16, portrait: 26, story: 40, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 360, portrait: 420, story: 480, landscape: 0 }), f.by({ square: 48, portrait: 64, story: 84, landscape: 0 }), { color: GOLD }, 16),
+    clock(f, c, time, 10),
+  ]);
 });
 
-/** The sound as the hero: a wide amber waveform across deep teal, the time set large under it. */
-const bigWaveform = template("big-waveform", "Big Waveform", { color: "#04293a", to: "#0a4b5c", angle: 180 }, MINT, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const amber = "#f2b84b";
-  const cream = "#f4f1e8";
-  const mint = "#8cd3b9";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const titleSize = f.by({ square: 50, portrait: 56, story: 64, landscape: 56 });
-  const column = f.wide ? (right - left) * 0.6 : right - left;
-  f.add("text", "playing", left, top, column, f.lines(22), { text: "Now playing", font: "Space Mono", size: 22, weight: 700, color: amber, uppercase: true, letterSpacing: 220 });
-  const titleY = top + 44 * u;
-  const titleH = f.lines(titleSize, 2, 1.05);
-  f.add("title", "main", left, titleY, column, titleH, { font: "Syne Variable", size: titleSize, weight: 800, color: cream, lineHeight: 1.05 });
-
-  const side = 88 * u;
-  const captions = { font: "Syne Variable", size: f.by({ square: 52, portrait: 58, story: 66, landscape: 56 }), weight: 700, color: cream, highlight: amber, align: "left" as const };
-  const waveY = titleY + titleH + (f.wide ? 56 : 44) * u;
-  const waveH = H * f.by({ square: 0.22, portrait: 0.24, story: 0.22, landscape: 0.28 });
-  f.add("shape", "axis", left, waveY + waveH / 2 - 1 * u, right - left, 2 * u, { shape: "line", fill: amber, strokeWidth: 2, opacity: 0.35 });
-  f.add("visual", "main", left, waveY, right - left, waveH, { visual: "wave", color: amber });
-  const timeSize = f.by({ square: 38, portrait: 42, story: 50, landscape: 42 });
-  const timeY = waveY + waveH + 16 * u;
-  f.add("time", "main", left, timeY, 420 * u, f.lines(timeSize, 1, 1.3), { font: "Space Mono", size: timeSize, weight: 700, color: amber, align: "left" });
+/** A slate gallery wall and a gilt picture frame round the words, its corners cut in, a jewel in each. */
+const gildedFrame = template("gilded-frame", "Gilded Frame", { color: "#252e38", to: "#11161c", angle: 180 }, DUSK, (f) => {
+  const a = area(f);
+  const ivory = "#f1ead9";
+  const soft = "#a3adb8";
+  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: GOLD, uppercase: true, letterSpacing: 400 };
+  const title: Style = { font: PLAYFAIR, size: f.by({ square: 46, portrait: 54, story: 54, landscape: 56 }), weight: 500, color: ivory, lineHeight: 1.12, enter: "glide" };
+  const name: Style = { font: PLAYFAIR, size: 28, weight: 600, color: ivory };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
+  const words: Style = { font: PLAYFAIR, size: f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), weight: 500, color: ivory, highlight: "#e8d5a3", lineHeight: 1.32 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 4 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+  const gilt = (x: number, y: number, w: number, h: number) => {
+    f.add("graphic", "frame", x, y, w, h, { art: border(Math.round(w), Math.round(h), { gap: 16, outer: 7, inner: 1.5, corner: "round", cut: 34, jewels: "corners" }), color: GOLD, enter: "iris" });
+  };
 
   if (f.wide) {
-    byline(f, right - (right - left) * 0.32, top, side, (right - left) * 0.32, { font: "Syne Variable", size: 32, weight: 700, color: cream }, { font: "Space Mono", size: 22, weight: 400, color: mint });
-    const captionsY = timeY + f.lines(timeSize, 1, 1.3) + 20 * u;
-    f.add("captions", "main", left, captionsY, right - left, bottom - captionsY, captions);
+    const head = columnOf(a.left, a.right);
+    const titleH = f.lines(title.size!, 1, 1.12);
+    f.add("text", "kicker", head.x, a.top, head.w, f.lines(19, 1, 1.25), { text: "Episode XII", align: "center", lineHeight: 1.25, ...kicker });
+    f.add("title", "main", head.x, a.top + 44, head.w, titleH, { align: "center", ...title });
+    const frameY = a.top + 44 + titleH + 36;
+    const frameH = a.bottom - frameY;
+    const frameX = a.left + 60;
+    const frameW = a.w - 120;
+    gilt(frameX, frameY, frameW, frameH);
+    const inside = columnOf(frameX + 110, frameX + frameW - 110);
+    const side = 300;
+    stack(frameY + 60, frameY + frameH - 60, [cameo(f, inside.x + side / 2, 150, frame), names(f, columnOf(inside.x, inside.x + side), name, handle, 18), sound(f, inside.x + side / 2, 240, 50, { color: CHAMPAGNE }, 26), clock(f, columnOf(inside.x, inside.x + side), time, 8)]);
+    const words2 = columnOf(inside.x + side + 70, inside.x + inside.w);
+    stack(frameY + 60, frameY + frameH - 60, [space(), captions(f, words2, words, 4), space()]);
     return;
   }
-  const rowY = bottom - side;
-  byline(f, left, rowY, side, right - left, { font: "Syne Variable", size: 32, weight: 700, color: cream }, { font: "Space Mono", size: 22, weight: 400, color: mint });
-  const captionsY = timeY + f.lines(timeSize, 1, 1.3) + 28 * u;
-  f.add("captions", "main", left, captionsY, right - left, rowY - 36 * u - captionsY, captions);
+  const c = columnOf(a.left, a.right);
+  const kickerH = f.lines(19, 1, 1.25);
+  const titleH = f.lines(title.size!, 2, 1.12);
+  f.add("text", "kicker", c.x, a.top, c.w, kickerH, { text: "Episode XII", align: "center", lineHeight: 1.25, ...kicker });
+  f.add("title", "main", c.x, a.top + kickerH + 14, c.w, titleH, { align: "center", ...title });
+  const frameY = a.top + kickerH + 14 + titleH + f.by({ square: 26, portrait: 36, story: 52, landscape: 0 });
+  const frameH = a.bottom - frameY;
+  const frameX = a.left - 10;
+  const frameW = a.w + 20;
+  gilt(frameX, frameY, frameW, frameH);
+  const inside = columnOf(frameX + 80, frameX + frameW - 80);
+  stack(frameY + f.by({ square: 56, portrait: 70, story: 96, landscape: 0 }), frameY + frameH - f.by({ square: 50, portrait: 64, story: 90, landscape: 0 }), [
+    cameo(f, a.cx, f.by({ square: 96, portrait: 150, story: 220, landscape: 0 }), frame),
+    names(f, inside, name, handle, 14),
+    ornament(f, a.cx, "rule", taperedRule(), 300, { color: GOLD }, f.by({ square: 14, portrait: 24, story: 36, landscape: 0 })),
+    space(), captions(f, inside, words, 3, 14), space(),
+    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 70, landscape: 0 }), { color: CHAMPAGNE }, 14),
+    clock(f, inside, time, 8),
+  ]);
 });
 
-/** A soft pastel card on pink, rounded type, and a few paper shapes tucked round its corners. */
-const pastelCard = template("pastel-card", "Pastel Card", { color: "#fde4ea" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const ink = "#3d2c3e";
-  const soft = "#8a7a8c";
-  const font = "Fredoka Variable";
-  const blob = W * (f.wide ? 0.24 : 0.42);
-  f.add("shape", "blob", P * 0.2, H - P * 0.2 - blob, blob, blob, { shape: "ellipse", fill: "#cdb4f0" });
-  const inset = P * 0.6;
-  f.add("shape", "card", inset, inset, W - inset * 2, H - inset * 2, { shape: "rect", fill: "#fffaf6", radius: 0.06 });
-  const star = 150 * u;
-  f.add("shape", "star", W - P * 0.3 - star, P * 0.3, star, star, { shape: "star", fill: "#ffd2a8", rotation: 12, loop: "float", speed: 0.5 });
-  const heart = 72 * u;
-  f.add("shape", "heart", W - inset - heart * 0.7, H - inset - heart * 0.7, heart, heart * 0.9, { shape: "heart", fill: "#f7a8c4", rotation: -10 });
-
-  const left = P * 1.3;
-  const right = W - P * 1.3;
-  const top = f.tall ? H * 0.1 : P * 1.3;
-  const bottom = f.tall ? H * 0.86 : H - P * 1.3;
-  const column = f.wide ? W * 0.36 : right - left;
-  f.add("text", "episode", left + 6 * u, top + 4 * u, column, f.lines(24), { text: "Episode 12", font, size: 24, weight: 600, color: "#5b3e8a", background: "#ece1ff", uppercase: true, letterSpacing: 100 });
-  const titleSize = f.by({ square: 50, portrait: 54, story: 62, landscape: 60 });
-  const titleY = top + 60 * u;
-  const titleH = f.lines(titleSize, f.wide ? 3 : 2, 1.1);
-  f.add("title", "main", left, titleY, column, titleH, { font, size: titleSize, weight: 700, color: ink, lineHeight: 1.1 });
-
-  const side = 96 * u;
-  const rowY = bottom - side;
-  ring(f, left, rowY, side, 6, "#ffd2a8");
-  byline(f, left, rowY, side, column, { font, size: 34, weight: 700, color: ink }, { font, size: 26, weight: 500, color: soft });
-  const captions = { font, size: f.by({ square: 54, portrait: 60, story: 70, landscape: 62 }), weight: 600, color: ink, highlight: "#9ad8c4", align: "center" as const };
-  const x = f.wide ? left + column + P : left;
-  const timeY = (f.wide ? bottom : rowY - 36 * u) - 30 * u;
-  f.add("time", "main", x, timeY, right - x, 30 * u, { font, size: 22, weight: 500, color: soft, align: "center" });
-  const visualH = H * (f.wide ? 0.14 : 0.09);
-  const visualY = timeY - 10 * u - visualH;
-  f.add("visual", "main", x, visualY, right - x, visualH, { visual: "bars", color: "#f7a8c4" });
-  const captionsY = f.wide ? top : titleY + titleH + 32 * u;
-  f.add("captions", "main", x, captionsY, right - x, visualY - 28 * u - captionsY, captions);
-});
-
-/** A magazine cover: a photo under a red masthead, a cover line, the words below and the sound as its barcode. */
-const magazineCover = template("magazine-cover", "Magazine Cover", { color: "#f6f2ea" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const red = "#c8102e";
-  const ink = "#1a1a1a";
-  const soft = "#6b6560";
-  const serif = "Libre Baskerville";
-  const sans = "Inter Variable";
-  const edge = P * 0.5;
-  const captions = { font: serif, size: f.by({ square: 40, portrait: 46, story: 54, landscape: 46 }), weight: 700, color: ink, highlight: red, align: "left" as const };
-  const kicker = { text: "The interview", font: sans, size: 22, weight: 800, color: "#ffffff", background: red, uppercase: true, letterSpacing: 200 } as const;
+/** A green salon papered in a gilt trellis: a script greeting, the words on a quiet panel framed in gold. */
+const emeraldSalon = template("emerald-salon", "Emerald Salon", { color: "#0f4d3c", to: "#06271e", angle: 180 }, MINT, (f) => {
+  const a = area(f);
+  const ivory = "#f4ecd8";
+  const soft = "#9fcbb8";
+  f.add("graphic", "trellis", 0, 0, f.width, f.height, { art: trellis(f.width, f.height, f.by({ square: 96, portrait: 96, story: 110, landscape: 110 })), color: GOLD, opacity: 0.1 });
+  const script: Style = { font: PINYON, size: f.by({ square: 58, portrait: 66, story: 78, landscape: 70 }), color: GOLD, lineHeight: 1.3, enter: "fade" };
+  const title: Style = { font: BODONI, size: f.by({ square: 44, portrait: 50, story: 50, landscape: 42 }), weight: 600, color: ivory, lineHeight: 1.12, uppercase: true, letterSpacing: 60, enter: "glide" };
+  const name: Style = { font: BODONI, size: 27, weight: 600, color: ivory, uppercase: true, letterSpacing: 120 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
+  const words: Style = { font: BASKERVILLE, size: f.by({ square: 52, portrait: 60, story: 66, landscape: 56 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.4 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 4, halo: rings([196, 2], [182, 1]), scale: 1.3 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+  const panel = (x: number, y: number, w: number, h: number) => {
+    f.add("shape", "panel", x, y, w, h, { shape: "rect", fill: "#0a3a2d", stroke: GOLD, strokeWidth: 2 });
+    f.add("graphic", "panel-rule", x + 12, y + 12, w - 24, h - 24, { art: border(Math.round(w - 24), Math.round(h - 24), { gap: 0, outer: 1 }), color: GOLD, opacity: 0.7 });
+  };
 
   if (f.wide) {
-    const photoW = W * 0.5;
-    f.add("image", "photo", edge, edge, photoW, H - edge * 2, { mask: "rect" });
-    const left = edge + photoW + P * 0.75;
-    const right = W - P * 0.75;
-    f.add("text", "masthead", left, edge - 10 * u, right - left, f.lines(124, 1, 1.05), { text: "The Weekly", font: "Abril Fatface", size: 124, weight: 400, color: red, uppercase: true, lineHeight: 1.05 });
-    const issueY = edge + f.lines(124, 1, 1.05);
-    f.add("text", "issue", left, issueY, right - left, f.lines(20), { text: "Issue 12 · The audio edition", font: sans, size: 20, weight: 700, color: soft, uppercase: true, letterSpacing: 240 });
-    f.add("text", "kicker", left + 6 * u, issueY + 64 * u, right - left, f.lines(22), kicker);
-    f.add("title", "main", left, issueY + 108 * u, right - left, f.lines(50, 2, 1.15), { font: serif, size: 50, weight: 700, color: ink });
-    const footY = H - P * 0.75 - 72 * u;
-    const captionsY = issueY + 108 * u + f.lines(50, 2, 1.15) + 32 * u;
-    f.add("captions", "main", left, captionsY, right - left, footY - 28 * u - captionsY, captions);
-    byline(f, left, footY, 72 * u, (right - left) * 0.6, { font: sans, size: 26, weight: 700, color: ink }, { font: sans, size: 20, weight: 500, color: soft });
-    f.add("visual", "main", right - 200 * u, footY, 200 * u, 50 * u, { visual: "bars", color: ink });
-    f.add("time", "main", right - 200 * u, footY + 52 * u, 200 * u, 22 * u, { font: MONO, size: 16, weight: 500, color: ink, align: "center" });
+    const left = columnOf(a.left, f.width * 0.42);
+    stack(a.top, a.bottom, [
+      label(f, left, "script", "In conversation", script),
+      heading(f, left, title, 2, 6),
+      cameo(f, left.x + left.w / 2, 190, frame, 36),
+      names(f, left, name, handle, 20),
+      clock(f, left, time, 14),
+    ]);
+    const px = f.width * 0.47;
+    const pw = a.right - px;
+    panel(px, a.top, pw, a.bottom - a.top);
+    const inside = columnOf(px + 70, px + pw - 70);
+    stack(a.top + 60, a.bottom - 50, [space(), captions(f, inside, words, 4), space(), sound(f, inside.x + inside.w / 2, 480, 64, { color: GOLD }, 30)]);
     return;
   }
-
-  const photoH = H * f.by({ square: 0.64, portrait: 0.68, story: 0.66, landscape: 0.68 });
-  const photoY = f.tall ? H * 0.05 : edge;
-  // A dark ground under the cover photo, so the white title reads before a photo is dropped in, and in the video.
-  f.add("shape", "backing", edge, photoY, W - edge * 2, photoH, { shape: "rect", fill: "#2a2623" });
-  f.add("image", "photo", edge, photoY, W - edge * 2, photoH, { mask: "rect" });
-  const mastSize = f.by({ square: 124, portrait: 132, story: 140, landscape: 132 });
-  f.add("text", "masthead", edge, photoY + 8 * u, W - edge * 2, f.lines(mastSize, 1, 1.05), { text: "The Weekly", font: "Abril Fatface", size: mastSize, weight: 400, color: red, align: "center", uppercase: true, lineHeight: 1.05 });
-  const issueY = photoY + 8 * u + f.lines(mastSize, 1, 1.05) + 4 * u;
-  f.add("text", "issue", edge, issueY, W - edge * 2, f.lines(20), { text: "Issue 12 · The audio edition", font: sans, size: 20, weight: 700, color: "#ffffff", align: "center", uppercase: true, letterSpacing: 240, shadow: true });
-  const left = P;
-  const right = W - P;
-  const titleSize = f.by({ square: 40, portrait: 44, story: 52, landscape: 44 });
-  const titleH = f.lines(titleSize, 2, 1.15);
-  const titleY = photoY + photoH - P * 0.5 - titleH;
-  f.add("title", "main", left, titleY, (right - left) * 0.8, titleH, { font: serif, size: titleSize, weight: 700, color: "#ffffff", shadow: true });
-  f.add("text", "kicker", left + 6 * u, titleY - 44 * u, right - left, f.lines(22), kicker);
-
-  const bottom = f.tall ? H * 0.88 : H - P * 0.6;
-  const footY = bottom - 64 * u;
-  byline(f, left, footY, 64 * u, (right - left) * 0.6, { font: sans, size: 24, weight: 700, color: ink }, { font: sans, size: 20, weight: 500, color: soft });
-  f.add("visual", "main", right - 180 * u, footY - 4 * u, 180 * u, 46 * u, { visual: "bars", color: ink });
-  f.add("time", "main", right - 180 * u, footY + 44 * u, 180 * u, 22 * u, { font: MONO, size: 16, weight: 500, color: ink, align: "center" });
-  const captionsY = photoY + photoH + 24 * u;
-  f.add("captions", "main", left, captionsY, right - left, footY - 16 * u - captionsY, captions);
+  const c = columnOf(a.left, a.right);
+  const panelGap = f.by({ square: 22, portrait: 30, story: 44, landscape: 0 });
+  const panelH = f.by({ square: 300, portrait: 380, story: 560, landscape: 0 });
+  stack(a.top, a.bottom, [
+    label(f, c, "script", "In conversation", script),
+    heading(f, c, title, 2, 2),
+    cameo(f, a.cx, f.by({ square: 100, portrait: 140, story: 200, landscape: 0 }), frame, f.by({ square: 20, portrait: 30, story: 46, landscape: 0 })),
+    names(f, c, name, handle, 14),
+    {
+      h: panelH,
+      gap: panelGap,
+      flex: 1,
+      draw: (y, h) => {
+        panel(a.left, y, a.w, h);
+        const inside = columnOf(a.left + 56, a.right - 56);
+        stack(y + 36, y + h - 30, [space(), captions(f, inside, words, 3), space(), sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 52, story: 70, landscape: 0 }), { color: GOLD }, 14)]);
+      },
+    },
+    clock(f, c, time, 14),
+  ]);
 });
 
-/** A developer's window: traffic-light dots, a terminal prompt, green for the word being said, blue for the sound. */
-const techTalk = template("tech-talk", "Tech Talk", { color: "#0d1117" }, INK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const text = "#e6edf3";
-  const soft = "#8b949e";
-  const green = "#3fb950";
-  const blue = "#58a6ff";
-  const edge = "#30363d";
-  const top = f.tall ? H * 0.09 : P * 0.6;
-  const bottom = f.tall ? H * 0.86 : H - P * 0.6;
-  const winX = P * 0.6;
-  const winW = W - winX * 2;
-  const side = 80 * u;
-  const rowY = bottom - side;
-  const winH = rowY - 36 * u - top;
-  f.add("shape", "window", winX, top, winW, winH, { shape: "rect", fill: "#161b22", radius: 0.025, stroke: edge, strokeWidth: 2 });
-  ["#ff5f57", "#febc2e", "#28c840"].forEach((fill, index) => {
-    f.add("shape", `dot-${index + 1}`, winX + (28 + index * 30) * u, top + 26 * u, 18 * u, 18 * u, { shape: "ellipse", fill });
-  });
-  f.add("text", "path", winX, capsTop(f, top + 35 * u, 20), winW, f.lines(20), { text: "~/episodes/012", font: MONO, size: 20, weight: 500, color: soft, align: "center" });
-  f.add("shape", "titlebar", winX, top + 68 * u, winW, 2 * u, { shape: "rect", fill: edge });
-
-  const left = winX + 48 * u;
-  const right = winX + winW - 48 * u;
-  const promptY = top + 68 * u + 40 * u;
-  f.add("text", "prompt", left, promptY, right - left, f.lines(24), { text: "> now playing", font: MONO, size: 24, weight: 600, color: green, enter: "typewriter" });
-  const titleSize = f.by({ square: 40, portrait: 44, story: 50, landscape: 44 });
-  const titleY = promptY + 44 * u;
-  const titleH = f.lines(titleSize, 2, 1.2);
-  f.add("title", "main", left, titleY, (right - left) * (f.wide ? 0.7 : 1), titleH, { font: MONO, size: titleSize, weight: 700, color: text, lineHeight: 1.2 });
-  const timeY = top + winH - 40 * u - 28 * u;
-  f.add("time", "main", right - 300 * u, timeY, 300 * u, 28 * u, { font: MONO, size: 20, weight: 500, color: soft, align: "right" });
-  const visualH = H * (f.wide ? 0.12 : 0.09);
-  const visualY = timeY - 10 * u - visualH;
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "bars", color: blue });
-  const captionsY = titleY + titleH + 32 * u;
-  f.add("captions", "main", left, captionsY, right - left, visualY - 28 * u - captionsY, {
-    font: "Space Grotesk Variable", size: f.by({ square: 52, portrait: 58, story: 66, landscape: 58 }), weight: 700, color: text, highlight: green, align: "left",
-  });
-
-  byline(f, winX, rowY, side, winW * 0.65, { font: "Space Grotesk Variable", size: 30, weight: 600, color: text }, { font: MONO, size: 22, weight: 400, color: soft });
-  const tagW = monoWidth(f, "Tech talk", 20, 140) + 48 * u;
-  pill(f, "tag", winX + winW - tagW, rowY + side / 2 - 24 * u, "Tech talk", { size: 20, height: 48, fill: "#1f6feb", color: "#ffffff" });
-});
-
-/** A slow Sunday morning: latte paper, a hand-written heading by a cup, the words on a stitched card. */
-const coffeeChat = template("coffee-chat", "Coffee Chat", { color: "#eadcc8" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const brown = "#5a3825";
-  const caramel = "#c7773a";
-  const ink = "#3b2a20";
-  const soft = "#8a6b55";
-  const font = "Nunito Variable";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const cup = 76 * u;
-  f.add("graphic", "cup", left, top, cup, cup, { art: CUP, color: caramel });
-  const scriptSize = f.by({ square: 58, portrait: 62, story: 70, landscape: 62 });
-  f.add("text", "heading", left + cup + 20 * u, top + cup / 2 - f.lines(scriptSize, 1, 1) * 0.6, right - left - cup - 20 * u, f.lines(scriptSize, 1, 1), { text: "Sunday coffee chat", font: "Caveat Variable", size: scriptSize, weight: 700, color: brown, lineHeight: 1 });
-  const titleY = top + cup + 20 * u;
-  f.add("title", "main", left, titleY, right - left, f.lines(24), { font, size: 24, weight: 800, color: soft, uppercase: true, letterSpacing: 160 });
-
-  const side = 96 * u;
-  const rowY = bottom - side;
-  ring(f, left, rowY, side, 6, caramel);
-  byline(f, left, rowY, side, (right - left) * 0.7, { font, size: 34, weight: 800, color: ink }, { font, size: 26, weight: 600, color: soft });
-  f.add("time", "main", right - 240 * u, rowY + side / 2 - 16 * u, 240 * u, 32 * u, { font, size: 24, weight: 700, color: soft, align: "right" });
-  const visualH = f.by({ square: 70, portrait: 96, story: 120, landscape: 80 }) * u;
-  const visualY = rowY - 40 * u - visualH;
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "wave", color: brown });
-  const cardY = titleY + f.lines(24) + 36 * u;
-  const cardH = visualY - 36 * u - cardY;
-  f.add("shape", "card", left, cardY, right - left, cardH, { shape: "rect", fill: "#f7f0e6", radius: 0.08, stroke: "#cfb390", strokeWidth: 3, dash: "dashed" });
-  const inner = 40 * u;
-  f.add("captions", "main", left + inner, cardY + inner * 0.6, right - left - inner * 2, cardH - inner * 1.2, {
-    font, size: f.by({ square: 54, portrait: 60, story: 68, landscape: 58 }), weight: 800, color: ink, highlight: caramel, align: "center",
-  });
-});
-
-/** A chalkboard in a wooden frame: a lesson number in yellow chalk, the words written up in a hand-drawn face. */
-const lecture = template("lecture", "Lecture Notes", { color: "#22382e", to: "#1a2c24", angle: 180 }, MINT, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const chalk = "#f2efe6";
-  const yellow = "#f6d55c";
-  const soft = "#a9c4b5";
-  const wood = "#7a5532";
-  const edge = P * 0.35;
-  f.add("shape", "board", edge, edge, W - edge * 2, H - edge * 2, { shape: "rect", fill: "#26402f", radius: 0.012, stroke: wood, strokeWidth: 18 });
-  const ledgeW = Math.min(W * 0.4, 420 * u);
-  const ledgeY = H - edge - 44 * u;
-  f.add("shape", "ledge", W / 2 - ledgeW / 2, ledgeY, ledgeW, 22 * u, { shape: "rect", fill: "#5c3f24", radius: 0.3 });
-  f.add("shape", "chalk", W / 2 - ledgeW * 0.3, ledgeY - 12 * u, 72 * u, 12 * u, { shape: "rect", fill: chalk, radius: 0.5 });
-  f.add("shape", "chalk-yellow", W / 2 + ledgeW * 0.08, ledgeY - 12 * u, 52 * u, 12 * u, { shape: "rect", fill: yellow, radius: 0.5 });
-
-  const left = P * 1.1;
-  const right = W - P * 1.1;
-  const top = f.tall ? H * 0.09 : P * 1.1;
-  const bottom = f.tall ? H * 0.84 : ledgeY - 40 * u;
-  const column = f.wide ? (right - left) * 0.38 : right - left;
-  f.add("text", "lesson", left, top, column, f.lines(26), { text: "Lecture 04", font: "Shantell Sans Variable", size: 26, weight: 700, color: yellow, uppercase: true, letterSpacing: 140 });
-  const titleSize = f.by({ square: 54, portrait: 58, story: 66, landscape: 58 });
-  const titleY = top + 50 * u;
-  const titleH = f.lines(titleSize, f.wide ? 3 : 2, 1.25);
-  f.add("title", "main", left, titleY, column, titleH, { font: "Kalam", size: titleSize, weight: 700, color: chalk, lineHeight: 1.25, underline: true });
-
-  const side = 88 * u;
-  const rowY = bottom - side;
-  ring(f, left, rowY, side, 4, chalk);
-  byline(f, left, rowY, side, column * (f.wide ? 1 : 0.7), { font: "Shantell Sans Variable", size: 30, weight: 700, color: chalk }, { font: "Shantell Sans Variable", size: 22, weight: 400, color: soft });
-  const x = f.wide ? left + column + P : left;
-  const timeY = f.wide ? bottom - 30 * u : rowY + side / 2 - 15 * u;
-  f.add("time", "main", right - 240 * u, timeY, 240 * u, 30 * u, { font: "Shantell Sans Variable", size: 22, weight: 500, color: soft, align: "right" });
-  const visualH = H * (f.wide ? 0.13 : 0.08);
-  const visualY = (f.wide ? timeY - 16 * u : rowY - 36 * u) - visualH;
-  f.add("visual", "main", x, visualY, right - x, visualH, { visual: "bars", color: chalk, opacity: 0.85 });
-  const captionsY = f.wide ? top : titleY + titleH + 32 * u;
-  f.add("captions", "main", x, captionsY, right - x, visualY - 28 * u - captionsY, {
-    font: "Kalam", size: f.by({ square: 56, portrait: 62, story: 70, landscape: 62 }), weight: 700, color: chalk, highlight: yellow, align: "center",
-  });
-});
-
-/** A sports desk: a slanted red banner, speed stripes, huge condensed capitals and a scoreboard clock. */
-const sportsDesk = template("sports-desk", "Sports Desk", { color: "#0b1d4d", to: "#06102b", angle: 180 }, INK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const red = "#e10600";
-  const yellow = "#ffcc00";
-  const soft = "#9fb3e6";
-  const navy = "#0b1d4d";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.09 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const stripe = 36 * u;
-  f.add("shape", "stripe-yellow", W - P * 0.3 - 300 * u, P * 0.3, 300 * u, stripe, { shape: "parallelogram", fill: yellow });
-  f.add("shape", "stripe-red", W - P * 0.3 - 220 * u, P * 0.3 + stripe + 12 * u, 220 * u, stripe, { shape: "parallelogram", fill: red });
-
-  const bannerH = 84 * u;
-  const bannerY = top + (f.tall ? 0 : stripe * 2 + 12 * u);
-  const bannerW = Math.min(right - left, 640 * u);
-  f.add("shape", "banner", left, bannerY, bannerW, bannerH, { shape: "parallelogram", fill: red, enter: "slide" });
-  f.add("text", "banner", left, capsTop(f, bannerY + bannerH / 2, 52) + 2 * u, bannerW, f.lines(52), { text: "The final word", font: "Anton", size: 52, weight: 400, color: "#ffffff", align: "center", uppercase: true, italic: true, letterSpacing: 20 });
-  const titleY = bannerY + bannerH + 20 * u;
-  f.add("title", "main", left, titleY, right - left, f.lines(26), { font: "Oswald Variable", size: 26, weight: 600, color: soft, uppercase: true, letterSpacing: 140 });
-
-  const side = 96 * u;
-  const rowY = bottom - side;
-  ring(f, left, rowY, side, 6, yellow);
-  byline(f, left, rowY, side, (right - left) * 0.7, { font: "Oswald Variable", size: 40, weight: 700, color: "#ffffff", uppercase: true }, { font: "Oswald Variable", size: 26, weight: 400, color: soft });
-  const clockW = 210 * u;
-  f.add("shape", "clock", right - clockW, rowY + side / 2 - 32 * u, clockW, 64 * u, { shape: "rect", fill: "#ffffff", radius: 0.12 });
-  f.add("time", "main", right - clockW, rowY + side / 2 - 32 * u, clockW, 64 * u, { font: "Oswald Variable", size: 32, weight: 600, color: navy, align: "center" });
-  const visualH = H * (f.wide ? 0.12 : 0.09);
-  const visualY = rowY - 40 * u - visualH;
-  f.add("visual", "main", left, visualY, right - left, visualH, { visual: "bars", color: yellow });
-  const captionsY = titleY + f.lines(26) + 32 * u;
-  f.add("captions", "main", left, captionsY, right - left, visualY - 32 * u - captionsY, {
-    font: "Anton", size: f.by({ square: 84, portrait: 92, story: 104, landscape: 90 }), weight: 400, color: "#ffffff", highlight: yellow, align: "center", uppercase: true,
-  });
-});
-
-/** Calm and airy: sage paper, soft round shapes, a leaf, and the sound as a slow breathing circle. */
-const wellness = template("wellness", "Calm Wellness", { color: "#e4ebe0" }, PAPER, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const deep = "#2f4a3a";
-  const sage = "#6f8f72";
-  const soft = "#5f7a63";
-  const serif = "Cormorant Garamond Variable";
-  const sans = "Raleway Variable";
-  const blob = Math.min(W, H) * 0.5;
-  f.add("shape", "blob", W - P * 0.2 - blob, P * 0.2, blob, blob * 0.9, { shape: "ellipse", fill: "#d5e0cf" });
-  f.add("shape", "blob-small", P * 0.2, H - P * 0.2 - blob * 0.62, blob * 0.72, blob * 0.62, { shape: "ellipse", fill: "#cddbc6" });
-  const top = f.tall ? H * 0.1 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  const captions = { font: serif, size: f.by({ square: 58, portrait: 64, story: 74, landscape: 64 }), weight: 700, color: deep, highlight: sage, align: "center" as const };
-  const leaf = 48 * u;
+/** A wine cellar's medal: oxblood, rose gold, the speaker set in a scalloped rosette between two laurel sprigs. */
+const bordeaux = template("bordeaux", "Bordeaux", { color: "#5c1424", to: "#2a0810", angle: 180 }, EMBER, (f) => {
+  const a = area(f);
+  const ivory = "#f7ebe4";
+  const soft = "#d9a99b";
+  frameBorder(f, f.pad * 0.4, { gap: 10, outer: 1.5, inner: 1, corner: "round", cut: 40 }, ROSE, 0.85);
+  const kicker: Style = { font: TENOR, size: 22, color: ROSE, uppercase: true, letterSpacing: 460 };
+  const title: Style = { font: PRATA, size: f.by({ square: 44, portrait: 52, story: 52, landscape: 52 }), color: ivory, lineHeight: 1.18, enter: "glide" };
+  const name: Style = { font: PRATA, size: 28, color: ivory, letterSpacing: 40 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
+  const words: Style = { font: PRATA, size: f.by({ square: 56, portrait: 64, story: 74, landscape: 62 }), color: ivory, highlight: "#efc6b4", lineHeight: 1.36 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+  // The rosette's hole is a little over half its width, so the photo sits just inside its inner ring; a sprig of laurel
+  // reaches out from each side of it, as far as `room` allows.
+  const medal = (cx: number, d: number, room: number): Block => {
+    const w = d / 0.52;
+    const sprig = laurelSprig();
+    return {
+      h: w * f.unit,
+      gap: 0,
+      draw: (y) => {
+        const sw = Math.min(w * 0.9, (room - w) / 2 / 0.92);
+        const sh = (sw * sprig.h) / sprig.w;
+        const cy = y + (w * f.unit) / 2;
+        f.add("graphic", "sprig-left", cx - w / 2 - sw * 0.92, cy - sh / 2 + w * 0.12, sw, sh, { art: sprig, color: ROSE, flipX: true });
+        f.add("graphic", "sprig-right", cx + w / 2 - sw * 0.08, cy - sh / 2 + w * 0.12, sw, sh, { art: sprig, color: ROSE });
+        cameoAt(f, cx, cy, d, { halo: rosette(), scale: 1 / 0.52, haloColor: ROSE, loop: "slowZoom" });
+      },
+    };
+  };
 
   if (f.wide) {
-    const left = P * 1.2;
-    const column = W * 0.4;
-    f.add("graphic", "leaf", left, top, leaf, leaf, { art: LEAF, color: sage });
-    f.add("text", "label", left, top + leaf + 24 * u, column, f.lines(22), { text: "Mindful minutes", font: sans, size: 22, weight: 600, color: soft, uppercase: true, letterSpacing: 300 });
-    f.add("title", "main", left, top + leaf + 72 * u, column, f.lines(66, 3, 1.05), { font: serif, size: 66, weight: 600, color: deep, lineHeight: 1.05 });
-    byline(f, left, bottom - 88 * u, 88 * u, column, { font: sans, size: 30, weight: 600, color: deep }, { font: sans, size: 22, weight: 400, color: soft });
-    const x = left + column + P;
-    const right = W - P;
-    const pulse = 240 * u;
-    f.add("visual", "main", x + (right - x) / 2 - pulse / 2, top, pulse, pulse, { visual: "pulse", color: sage });
-    f.add("captions", "main", x, top + pulse + 32 * u, right - x, bottom - top - pulse - 32 * u, captions);
+    const left = columnOf(a.left + 40, f.width * 0.42);
+    const right = columnOf(f.width * 0.46, a.right - 50);
+    stack(a.top, a.bottom, [medal(left.x + left.w / 2, 190, left.w), names(f, left, name, handle, 34)]);
+    stack(a.top, a.bottom, [
+      label(f, right, "kicker", "Vintage edition", kicker),
+      heading(f, right, title, 2, 16),
+      ornament(f, right.x + right.w / 2, "rule", taperedRule(), 380, { color: ROSE }, 14),
+      space(), captions(f, right, words, 3, 16), space(),
+      sound(f, right.x + right.w / 2, 480, 64, { color: ROSE }, 16),
+      clock(f, right, time, 10),
+    ]);
     return;
   }
-
-  const left = P;
-  const right = W - P;
-  f.add("graphic", "leaf", W / 2 - leaf / 2, top, leaf, leaf, { art: LEAF, color: sage });
-  f.add("text", "label", left, top + leaf + 20 * u, right - left, f.lines(22), { text: "Mindful minutes", font: sans, size: 22, weight: 600, color: soft, align: "center", uppercase: true, letterSpacing: 300 });
-  const titleSize = f.by({ square: 54, portrait: 60, story: 70, landscape: 60 });
-  const titleY = top + leaf + 64 * u;
-  const titleH = f.lines(titleSize, 2, 1.05);
-  f.add("title", "main", left, titleY, right - left, titleH, { font: serif, size: titleSize, weight: 600, color: deep, align: "center", lineHeight: 1.05 });
-  const pulse = f.by({ square: 180, portrait: 240, story: 320, landscape: 240 }) * u;
-  const pulseY = titleY + titleH + 28 * u;
-  f.add("visual", "main", W / 2 - pulse / 2, pulseY, pulse, pulse, { visual: "pulse", color: sage });
-
-  const side = 80 * u;
-  const handleY = bottom - f.lines(22, 1, 1.3);
-  const nameY = handleY - f.lines(30, 1, 1.3);
-  const avatarY = nameY - 12 * u - side;
-  f.add("avatar", "main", W / 2 - side / 2, avatarY, side, side);
-  f.add("name", "main", left, nameY, right - left, f.lines(30, 1, 1.3), { font: sans, size: 30, weight: 600, color: deep, align: "center" });
-  f.add("handle", "main", left, handleY, right - left, f.lines(22, 1, 1.3), { font: sans, size: 22, weight: 400, color: soft, align: "center" });
-  const captionsY = pulseY + pulse + 24 * u;
-  f.add("captions", "main", left, captionsY, right - left, avatarY - 28 * u - captionsY, captions);
+  const c = columnOf(a.left + 30, a.right - 30);
+  stack(a.top, a.bottom, [
+    label(f, c, "kicker", "Vintage edition", kicker),
+    heading(f, c, title, 2, 14),
+    { ...medal(a.cx, f.by({ square: 104, portrait: 150, story: 210, landscape: 0 }), c.w), gap: f.by({ square: 18, portrait: 30, story: 48, landscape: 0 }) },
+    names(f, c, name, handle, 14),
+    space(), captions(f, c, words, 3, f.by({ square: 12, portrait: 24, story: 40, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 60, story: 80, landscape: 0 }), { color: ROSE }, 14),
+    clock(f, c, time, 10),
+  ]);
 });
 
-/** A morning market note: three tickers, a rising chart, and green for the word being said. */
-const financeBrief = template("finance-brief", "Finance Brief", { color: "#0f1420" }, INK, (f) => {
-  const { width: W, height: H, pad: P, unit: u } = f;
-  const text = "#f1f3f7";
-  const soft = "#7d8597";
-  const green = "#16c784";
-  const red = "#ea3943";
-  const font = "Archivo Variable";
-  const left = P;
-  const right = W - P;
-  const top = f.tall ? H * 0.09 : P;
-  const bottom = f.tall ? H * 0.86 : H - P;
-  f.add("text", "brief", left, top, (right - left) * 0.6, f.lines(28), { text: "Market brief", font, size: 28, weight: 800, color: text, uppercase: true, letterSpacing: 120 });
-  f.add("text", "date", right - 360 * u, top + 4 * u, 360 * u, f.lines(22), { text: "Mon · 08:30 ET", font: MONO, size: 22, weight: 500, color: soft, align: "right", uppercase: true });
-  const ruleY = top + 52 * u;
-  f.add("shape", "rule", left, ruleY, right - left, 2 * u, { shape: "rect", fill: "#232a3b" });
+/** A jazz-age poster in black and gold: a fan rising behind the title, stepped corners, the title in a deco face. */
+const gatsbyDeco = template("gatsby-deco", "Gatsby Deco", { color: "#141210", to: "#070707", angle: 180 }, DUSK, (f) => {
+  const a = area(f);
+  const ivory = "#f2e8d2";
+  const soft = "#b3a68a";
+  const edge = f.pad * 0.36;
+  corners(f, decoCorner(), edge, edge, f.width - edge * 2, f.height - edge * 2, f.by({ square: 150, portrait: 170, story: 200, landscape: 170 }), { color: GOLD });
+  const kicker: Style = { font: TENOR, size: 22, color: GOLD, uppercase: true, letterSpacing: 520 };
+  const title: Style = { font: LIMELIGHT, size: f.by({ square: 48, portrait: 50, story: 50, landscape: 48 }), color: GOLD, uppercase: true, lineHeight: 1.12, letterSpacing: 60, enter: "unfold", loop: "shimmer" };
+  const name: Style = { font: TENOR, size: 24, color: ivory, uppercase: true, letterSpacing: 300 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 200 };
+  const words: Style = { font: MARCELLUS, size: f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), color: ivory, highlight: "#e2c27a", lineHeight: 1.34 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 4, halo: rings([196, 2.5], [184, 1]), scale: 1.28 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
 
-  const chips = [
-    { name: "btc", label: "BTC +2.4%", up: true },
-    { name: "ndx", label: "NDX -0.6%", up: false },
-    { name: "gold", label: "Gold +0.3%", up: true },
+  if (f.wide) {
+    const left = columnOf(a.left + 80, f.width * 0.4);
+    const right = columnOf(f.width * 0.45, a.right - 80);
+    stack(a.top, a.bottom, [ornament(f, left.x + left.w / 2, "fan", decoFan(), 420, { color: GOLD, enter: "iris" }), cameo(f, left.x + left.w / 2, 210, frame, 28), names(f, left, name, handle, 24)]);
+    upright(f, "seam", f.width * 0.425, a.top + 60, a.bottom - 60, GOLD, 0.5);
+    stack(a.top, a.bottom, [
+      label(f, right, "kicker", "Episode XII", kicker),
+      heading(f, right, title, 2, 16),
+      rule(f, right.x + right.w / 2, "rule", 160, GOLD, 2, 16),
+      space(), captions(f, right, words, 3, 18), space(),
+      sound(f, right.x + right.w / 2, 480, 64, { color: GOLD }, 18),
+      clock(f, right, time, 10),
+    ]);
+    return;
+  }
+  const c = columnOf(a.left + 30, a.right - 30);
+  const fanW = f.by({ square: 360, portrait: 460, story: 600, landscape: 0 });
+  stack(a.top, a.bottom, [
+    ornament(f, a.cx, "fan", decoFan(), fanW, { color: GOLD, enter: "iris" }),
+    label(f, c, "kicker", "Episode XII", kicker, 18),
+    heading(f, c, title, 2, 14),
+    cameo(f, a.cx, f.by({ square: 92, portrait: 132, story: 190, landscape: 0 }), frame, f.by({ square: 20, portrait: 32, story: 48, landscape: 0 })),
+    names(f, c, name, handle, 16),
+    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 22, story: 36, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 58, story: 78, landscape: 0 }), { color: GOLD }, 14),
+    clock(f, c, time, 10),
+  ]);
+});
+
+/** A book's title page pulled on ivory: black ink, an oxblood accent, a printer's leaf and a fine double rule. */
+const ivoryLetterpress = template("ivory-letterpress", "Ivory Letterpress", { color: "#f5efe3", to: "#ebe2d1", angle: 180 }, PAPER, (f) => {
+  const a = area(f);
+  const ink = "#1c1915";
+  const oxblood = "#7b1e28";
+  const soft = "#6f665b";
+  frameBorder(f, f.pad * 0.42, { gap: 7, outer: 2.5, inner: 1 }, ink, 0.9);
+  const kicker: Style = { font: BODONI, size: 22, weight: 600, color: oxblood, uppercase: true, letterSpacing: 420 };
+  const title: Style = { font: BODONI, size: f.by({ square: 56, portrait: 66, story: 66, landscape: 60 }), weight: 600, color: ink, lineHeight: 1.06, enter: "ascend" };
+  const name: Style = { font: BODONI, size: 24, weight: 600, color: ink, uppercase: true, letterSpacing: 220 };
+  const handle: Style = { font: BASKERVILLE, size: 22, color: soft };
+  const words: Style = { font: BASKERVILLE, size: f.by({ square: 50, portrait: 56, story: 64, landscape: 54 }), color: ink, highlight: oxblood, lineHeight: 1.45 };
+  const frame: CameoStyle = { halo: rings([194, 3], [178, 1]), scale: 1.3, haloColor: ink };
+  const time: Style = { font: BODONI, size: 20, weight: 500, color: soft, letterSpacing: 200 };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 60, f.width * 0.47);
+    const right = columnOf(f.width * 0.53, a.right - 60);
+    stack(a.top, a.bottom, [
+      label(f, left, "kicker", "Volume XII", kicker),
+      heading(f, left, title, 3, 22),
+      ornament(f, left.x + left.w / 2, "leaf", hedera(), 96, { color: oxblood }, 26),
+      cameo(f, left.x + left.w / 2, 120, frame, 30),
+      names(f, left, name, handle, 16),
+    ]);
+    upright(f, "seam", f.width * 0.5, a.top + 30, a.bottom - 30, ink, 0.6);
+    stack(a.top, a.bottom, [space(), captions(f, right, words, 5), space(), sound(f, right.x + right.w / 2, 420, 52, { color: ink }, 26), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 40, a.right - 40);
+  stack(a.top, a.bottom, [
+    label(f, c, "kicker", "Volume XII", kicker),
+    heading(f, c, title, 2, 20),
+    ornament(f, a.cx, "leaf", hedera(), f.by({ square: 84, portrait: 96, story: 112, landscape: 0 }), { color: oxblood }, 20),
+    space(), captions(f, c, words, 3, f.by({ square: 16, portrait: 26, story: 40, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 64, landscape: 0 }), { color: ink }, 16),
+    cameo(f, a.cx, f.by({ square: 76, portrait: 104, story: 140, landscape: 0 }), frame, f.by({ square: 20, portrait: 30, story: 50, landscape: 0 })),
+    names(f, c, name, handle, 12),
+    clock(f, c, time, 8),
+  ]);
+});
+
+/** Honed marble and gold leaf: grey veins under a double gilt border, capitals cut in charcoal. */
+const marbleGold = template("marble-gold", "Marble and Gold", { color: "#efece7", to: "#d6d1c9", angle: 160 }, PAPER, (f) => {
+  const a = area(f);
+  const charcoal = "#26231f";
+  const soft = "#6e675f";
+  // Gold leaf's highlights vanish into pale stone, so the small gilt parts take a deeper, flat gold.
+  const deepGold = "#9a7b3c";
+  f.add("graphic", "veins", 0, 0, f.width, f.height, { art: marbleVeins(f.width, f.height, f.by({ square: 11, portrait: 23, story: 37, landscape: 53 })), color: "#8d867d", opacity: 0.32 });
+  frameBorder(f, f.pad * 0.38, { gap: 12, outer: 3, inner: 1.5, jewels: "sides" }, GOLD);
+  const kicker: Style = { font: CINZEL, size: 22, weight: 700, color: "#8a6a2f", uppercase: true, letterSpacing: 400 };
+  const title: Style = { font: CINZEL, size: f.by({ square: 46, portrait: 54, story: 54, landscape: 54 }), weight: 600, color: charcoal, lineHeight: 1.14, letterSpacing: 20, enter: "glide" };
+  const name: Style = { font: CINZEL, size: 26, weight: 700, color: charcoal, letterSpacing: 80 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 66, portrait: 76, story: 84, landscape: 74 }), weight: 700, color: charcoal, highlight: charcoal, lineHeight: 1.28 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 6 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 60, f.width * 0.38);
+    const right = columnOf(f.width * 0.44, a.right - 60);
+    stack(a.top, a.bottom, [cameo(f, left.x + left.w / 2, 260, frame), names(f, left, name, handle, 28), clock(f, left, time, 14)]);
+    upright(f, "seam", f.width * 0.41, a.top + 40, a.bottom - 40, GOLD);
+    stack(a.top, a.bottom, [
+      label(f, right, "kicker", "Episode XII", kicker),
+      heading(f, right, title, 2, 16),
+      ornament(f, right.x + right.w / 2, "divider", divider(), 400, { color: deepGold }, 16),
+      space(), captions(f, right, words, 3, 16), space(),
+      sound(f, right.x + right.w / 2, 520, 64, { color: deepGold }, 18),
+    ]);
+    return;
+  }
+  const c = columnOf(a.left + 30, a.right - 30);
+  stack(a.top, a.bottom, [
+    label(f, c, "kicker", "Episode XII", kicker, f.by({ square: 10, portrait: 16, story: 0, landscape: 0 })),
+    heading(f, c, title, 2, 14),
+    ornament(f, a.cx, "divider", divider(), f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), { color: deepGold }, 16),
+    cameo(f, a.cx, f.by({ square: 104, portrait: 150, story: 210, landscape: 0 }), frame, f.by({ square: 22, portrait: 34, story: 54, landscape: 0 })),
+    names(f, c, name, handle, 14),
+    space(), captions(f, c, words, 3, f.by({ square: 12, portrait: 22, story: 40, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 58, story: 76, landscape: 0 }), { color: deepGold }, 14),
+    clock(f, c, time, 10),
+  ]);
+});
+
+/** A night at the opera: plum velvet and a gilt proscenium arch, "Tonight" in script above the title. */
+const midnightOpera = template("midnight-opera", "Midnight Opera", { color: "#2d0f33", to: "#0c0410", angle: 180 }, DUSK, (f) => {
+  const a = area(f);
+  const ivory = "#f5ead9";
+  const soft = "#bba3c2";
+  const script: Style = { font: VIBES, size: f.by({ square: 64, portrait: 74, story: 86, landscape: 76 }), color: GOLD, lineHeight: 1.25, enter: "fade" };
+  const title: Style = { font: PLAYFAIR, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 48 }), weight: 600, color: ivory, lineHeight: 1.14, uppercase: true, letterSpacing: 80, enter: "glide" };
+  const name: Style = { font: PLAYFAIR, size: 27, weight: 600, color: ivory };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
+  const words: Style = { font: PLAYFAIR, size: f.by({ square: 56, portrait: 64, story: 74, landscape: 62 }), weight: 500, color: ivory, highlight: "#e2c27a", lineHeight: 1.32 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 4, halo: rings([196, 1.5]), scale: 1.24 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 180 };
+  const arch = (x: number, y: number, w: number, h: number) => f.add("graphic", "arch", x, y, w, h, { art: archBorder(Math.round(w), Math.round(h), 14, 2.5), color: GOLD, enter: "curtain" });
+
+  if (f.wide) {
+    const aw = 720;
+    const ax = a.right - aw - 20;
+    arch(ax, a.top - 20, aw, a.bottom - a.top + 20);
+    const left = columnOf(a.left + 40, ax - 70);
+    stack(a.top, a.bottom, [label(f, left, "script", "Tonight", script), heading(f, left, title, 2, 4), ornament(f, left.x + left.w / 2, "rule", taperedRule(), 360, { color: GOLD }, 22), space(), captions(f, left, words, 3, 22), space(), sound(f, left.x + left.w / 2, 520, 64, { color: GOLD }, 18)]);
+    const inside = columnOf(ax + 80, ax + aw - 80);
+    stack(a.top + 200, a.bottom - 60, [cameo(f, ax + aw / 2, 250, frame), names(f, inside, name, handle, 26), clock(f, inside, time, 14)]);
+    return;
+  }
+  const archY = f.by({ square: a.top - 24, portrait: a.top - 20, story: a.top - 60, landscape: 0 });
+  arch(a.left - 20, archY, a.w + 40, a.bottom + 20 - archY);
+  const inside = columnOf(a.left + 40, a.right - 40);
+  stack(archY + (a.w + 40) * f.by({ square: 0.2, portrait: 0.22, story: 0.24, landscape: 0 }), a.bottom - 10, [
+    label(f, inside, "script", "Tonight", script),
+    heading(f, inside, title, 2, 0),
+    cameo(f, a.cx, f.by({ square: 92, portrait: 136, story: 196, landscape: 0 }), frame, f.by({ square: 18, portrait: 30, story: 50, landscape: 0 })),
+    names(f, inside, name, handle, 14),
+    space(), captions(f, inside, words, 3, f.by({ square: 8, portrait: 20, story: 36, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 72, landscape: 0 }), { color: GOLD }, 12),
+    clock(f, inside, time, 8),
+  ]);
+});
+
+/** The wireless age in walnut and bronze: a ribbon microphone under winged capitals, the station's name curved over it. */
+const heritageBroadcast = template("heritage-broadcast", "Heritage Broadcast", { color: "#2f2118", to: "#140d09", angle: 180 }, EMBER, (f) => {
+  const a = area(f);
+  const cream = "#f2e5cd";
+  const soft = "#c9a88d";
+  frameBorder(f, f.pad * 0.36, { gap: 9, outer: 1.5, inner: 1, corner: "step", cut: 22 }, BRONZE, 0.9);
+  const sign: Style = { font: CINZEL, size: f.by({ square: 24, portrait: 26, story: 30, landscape: 26 }), weight: 700, color: BRONZE, uppercase: true, letterSpacing: 300, curve: 26 };
+  const title: Style = { font: CINZEL, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 50 }), weight: 600, color: cream, lineHeight: 1.14, letterSpacing: 30, enter: "glide" };
+  const name: Style = { font: CINZEL, size: 26, weight: 600, color: cream, letterSpacing: 80 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
+  const words: Style = { font: BASKERVILLE, size: f.by({ square: 50, portrait: 56, story: 66, landscape: 54 }), weight: 700, color: cream, highlight: "#e0b872", lineHeight: 1.42 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 180 };
+  const mic = (cx: number, h: number, gap = 0): Block => {
+    const art = ribbonMic();
+    const micW = (h * art.w) / art.h;
+    const wings = decoWings();
+    const wingsW = micW * 3.1;
+    const wingsH = (wingsW * wings.h) / wings.w;
+    return {
+      h: h * f.unit,
+      gap,
+      draw: (y) => {
+        f.add("graphic", "wings", cx - wingsW / 2, y + h * 0.18, wingsW, wingsH, { art: wings, color: BRONZE, opacity: 0.8 });
+        f.add("graphic", "mic", cx - micW / 2, y, micW, h, { art, color: BRONZE, enter: "rise" });
+      },
+    };
+  };
+  const signBlock = (c: Column, gap = 0): Block => {
+    const h = f.lines(sign.size!, 1, 2.4);
+    return { h, gap, draw: (y) => f.add("text", "sign", c.x, y, c.w, h, { text: "On the wireless", align: "center", lineHeight: 1.25, ...sign }) };
+  };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 40, f.width * 0.4);
+    const right = columnOf(f.width * 0.46, a.right - 50);
+    stack(a.top, a.bottom, [signBlock(left), mic(left.x + left.w / 2, 300, 6), cameo(f, left.x + left.w / 2, 110, { rim: BRONZE, rimWidth: 4 }, 34), names(f, left, name, handle, 14)]);
+    upright(f, "seam", f.width * 0.43, a.top + 40, a.bottom - 40, BRONZE, 0.55);
+    stack(a.top, a.bottom, [heading(f, right, title, 2), rule(f, right.x + right.w / 2, "rule", 200, BRONZE, 2, 20), space(), captions(f, right, words, 4, 20), space(), sound(f, right.x + right.w / 2, 500, 64, { color: BRONZE }, 18), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 30, a.right - 30);
+  stack(a.top, a.bottom, [
+    signBlock(c),
+    mic(a.cx, f.by({ square: 150, portrait: 200, story: 270, landscape: 0 }), 4),
+    heading(f, c, title, 2, f.by({ square: 18, portrait: 28, story: 40, landscape: 0 })),
+    rule(f, a.cx, "rule", 160, BRONZE, 2, 14),
+    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 20, story: 34, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 42, portrait: 56, story: 76, landscape: 0 }), { color: BRONZE }, 12),
+    byline(f, a.cx - 190 * f.unit, 380 * f.unit, f.by({ square: 64, portrait: 80, story: 96, landscape: 0 }), name, handle, { rim: BRONZE, rimWidth: 4 }, f.by({ square: 18, portrait: 26, story: 40, landscape: 0 })),
+    clock(f, c, time, 12),
+  ]);
+});
+
+/** Blush stationery sealed in burgundy wax: a rose-gold initial pressed into the seal, the words below in a fine serif. */
+const monogram = template("the-monogram", "The Monogram", { color: "#f6ebe6", to: "#ecdcd5", angle: 180 }, PAPER, (f) => {
+  const a = area(f);
+  const wine = "#4c1826";
+  const soft = "#8a6a6f";
+  frameBorder(f, f.pad * 0.42, { gap: 0, outer: 1.5 }, ROSE, 0.9);
+  const kicker: Style = { font: TENOR, size: 22, color: "#9b5f5a", uppercase: true, letterSpacing: 460 };
+  const title: Style = { font: CORMORANT, size: f.by({ square: 54, portrait: 62, story: 64, landscape: 54 }), weight: 600, color: wine, lineHeight: 1.08, enter: "glide" };
+  const name: Style = { font: TENOR, size: 21, color: wine, uppercase: true, letterSpacing: 300 };
+  const handle: Style = { font: CORMORANT, size: 24, weight: 600, color: soft };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 66, portrait: 76, story: 88, landscape: 74 }), weight: 700, color: wine, highlight: wine, lineHeight: 1.26 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
+  const seal = (cx: number, w: number, gap = 0): Block => {
+    const side = w * f.unit;
+    return {
+      h: side,
+      gap,
+      draw: (y) => {
+        f.add("graphic", "seal", cx - side / 2, y, side, side, { art: waxSeal(), color: "#6d1a2a", enter: "pop" });
+        const size = Math.round(w * 0.44);
+        const h = f.lines(size, 1, 1);
+        f.add("text", "initial", cx - side / 2, y + side / 2 - size * f.unit * 0.42, side, h, { text: "E", font: CINZEL_DECO, size, weight: 700, color: ROSE, align: "center", lineHeight: 1 });
+      },
+    };
+  };
+  // The speaker signs off at the foot: the photo in a fine rose rim, the name beside it, the row centred in `c`.
+  const signature = (c: Column, d: number, gap = 0) => byline(f, c.x + c.w / 2 - 210 * f.unit, 420 * f.unit, d, name, handle, { rim: ROSE, rimWidth: 3 }, gap);
+
+  if (f.wide) {
+    const left = columnOf(a.left + 60, f.width * 0.42);
+    const right = columnOf(f.width * 0.47, a.right - 60);
+    stack(a.top, a.bottom, [seal(left.x + left.w / 2, 240), label(f, left, "kicker", "Private correspondence", kicker, 34), heading(f, left, title, 2, 14), signature(left, 86, 40)]);
+    upright(f, "seam", f.width * 0.445, a.top + 60, a.bottom - 60, ROSE, 0.6);
+    stack(a.top, a.bottom, [space(), captions(f, right, words, 4), space(), sound(f, right.x + right.w / 2, 460, 56, { color: "#9b5f5a" }, 24), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 40, a.right - 40);
+  stack(a.top, a.bottom, [
+    seal(a.cx, f.by({ square: 150, portrait: 190, story: 250, landscape: 0 })),
+    label(f, c, "kicker", "Private correspondence", kicker, f.by({ square: 20, portrait: 28, story: 40, landscape: 0 })),
+    heading(f, c, title, 2, 12),
+    space(), captions(f, c, words, 3, f.by({ square: 14, portrait: 24, story: 40, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 64, landscape: 0 }), { color: "#9b5f5a" }, 14),
+    signature(c, f.by({ square: 70, portrait: 82, story: 98, landscape: 0 }), f.by({ square: 22, portrait: 30, story: 46, landscape: 0 })),
+    clock(f, c, time, 12),
+  ]);
+});
+
+/** The evening paper: a masthead between heavy and fine rules, a dateline, the words set as the lead story. */
+const gazette = template("the-gazette", "The Gazette", { color: "#efe9dc" }, PAPER, (f) => {
+  const a = area(f, 0.8);
+  const ink = "#171512";
+  const red = "#9b1c1c";
+  const soft = "#625b52";
+  const mast: Style = { font: BODONI, size: f.by({ square: 112, portrait: 120, story: 128, landscape: 128 }), weight: 800, color: ink, lineHeight: 1.05, letterSpacing: -10 };
+  const dateline: Style = { font: BODONI, size: 19, weight: 600, color: ink, uppercase: true, letterSpacing: 260 };
+  const kicker: Style = { font: BODONI, size: 22, weight: 700, color: red, uppercase: true, letterSpacing: 300, align: "left" };
+  const title: Style = { font: BODONI, size: f.by({ square: 50, portrait: 58, story: 60, landscape: 58 }), weight: 700, color: ink, lineHeight: 1.08, align: "left", enter: "ascend" };
+  const name: Style = { font: BODONI, size: 20, weight: 700, color: ink, uppercase: true, letterSpacing: 200, align: "left" };
+  const handle: Style = { font: BASKERVILLE, size: 22, color: soft, align: "left" };
+  const words: Style = { font: BASKERVILLE, size: f.by({ square: 54, portrait: 60, story: 68, landscape: 56 }), color: ink, highlight: red, lineHeight: 1.4, align: "left" };
+  const time: Style = { font: BODONI, size: 20, weight: 600, color: soft, uppercase: true, letterSpacing: 200 };
+  // An opening quotation mark in the paper's red, hung over the words as a pull quote's would be.
+  const quote: Style = { font: BODONI, size: f.by({ square: 110, portrait: 130, story: 150, landscape: 130 }), weight: 800, color: red, align: "left", lineHeight: 0.62 };
+  const c = columnOf(a.left, a.right);
+  const head: Block[] = [
+    label(f, c, "masthead", "The Gazette", mast),
+    rule(f, a.cx, "rule-heavy", a.w, ink, 5, 4),
+    pair(f, c, ["edition", "issue"], ["Evening edition", "Episode XII"], dateline, 6),
+    rule(f, a.cx, "rule-fine", a.w, ink, 1.5, 2),
   ];
-  const chipGap = 16 * u;
-  const chipW = (right - left - chipGap * 2) / 3;
-  const chipH = 56 * u;
-  const chipY = ruleY + 26 * u;
-  chips.forEach((chip, index) => {
-    const x = left + index * (chipW + chipGap);
-    f.add("shape", `chip-${chip.name}`, x, chipY, chipW, chipH, { shape: "rect", fill: "#161c2b", radius: 0.25 });
-    f.add("shape", `arrow-${chip.name}`, x + 22 * u, chipY + chipH / 2 - 8 * u, 18 * u, 16 * u, { shape: "triangle", fill: chip.up ? green : red, rotation: chip.up ? 0 : 180 });
-    f.add("text", `chip-${chip.name}`, x + 52 * u, capsTop(f, chipY + chipH / 2, 22), chipW - 64 * u, f.lines(22), { text: chip.label, font: MONO, size: 22, weight: 600, color: text, uppercase: true });
-  });
+  const credit = (col: Column, d: number, gap = 0) => byline(f, col.x, col.w, d, name, handle, { rim: ink, rimWidth: 2 }, gap);
 
-  const side = 80 * u;
-  const rowY = bottom - side;
-  byline(f, left, rowY, side, (right - left) * 0.62, { font, size: 30, weight: 700, color: text }, { font: MONO, size: 22, weight: 400, color: soft });
-  const visualW = 220 * u;
-  f.add("visual", "main", right - visualW, rowY + side / 2 - 28 * u, visualW, 56 * u, { visual: "bars", color: green });
-
-  const captions = { font, size: f.by({ square: 50, portrait: 56, story: 64, landscape: 58 }), weight: 700, color: text, highlight: green, align: "left" as const };
-  const titleY = chipY + chipH + 36 * u;
   if (f.wide) {
-    const column = (right - left) * 0.46;
-    const titleH = f.lines(52, 2, 1.1);
-    f.add("title", "main", left, titleY, column, titleH, { font, size: 52, weight: 700, color: text, lineHeight: 1.1 });
-    const captionsY = titleY + titleH + 28 * u;
-    f.add("captions", "main", left, captionsY, column, rowY - 32 * u - captionsY, captions);
-    const x = left + column + P * 0.75;
-    const chartH = rowY - 76 * u - titleY;
-    f.add("graphic", "chart", x, titleY, right - x, chartH, { art: chartArt((right - x) / chartH, green, "#12352c"), color: green });
-    f.add("time", "main", right - 300 * u, titleY + chartH + 8 * u, 300 * u, 30 * u, { font: MONO, size: 20, weight: 500, color: soft, align: "right" });
+    const lead = columnOf(a.left, a.left + a.w * 0.64);
+    const side = columnOf(lead.x + lead.w + 60, a.right);
+    const mastH = head.reduce((sum, block) => sum + block.h + block.gap, 0);
+    stack(a.top, a.top + mastH, head);
+    const top = a.top + mastH + 34;
+    upright(f, "column", lead.x + lead.w + 30, top, a.bottom, ink, 0.7);
+    stack(top, a.bottom, [label(f, lead, "kicker", "The interview", kicker), heading(f, lead, title, 2, 8), space(), label(f, lead, "quote", "“", quote), captions(f, lead, words, 2), space(1.4)]);
+    stack(top, a.bottom, [credit(side, 80), rule(f, side.x + side.w / 2, "rule-side", side.w, ink, 1, 18), sound(f, side.x + side.w / 2, side.w, 80, { color: ink }, 22), clock(f, side, { ...time, align: "left" }, 12), space(), links(f, side, { ...time, align: "left" })]);
     return;
   }
-  const titleSize = f.by({ square: 44, portrait: 48, story: 56, landscape: 48 });
-  const titleH = f.lines(titleSize, 2, 1.1);
-  f.add("title", "main", left, titleY, right - left, titleH, { font, size: titleSize, weight: 700, color: text, lineHeight: 1.1 });
-  const chartY = titleY + titleH + 32 * u;
-  const chartH = f.by({ square: 130, portrait: 190, story: 280, landscape: 190 }) * u;
-  f.add("graphic", "chart", left, chartY, right - left, chartH, { art: chartArt((right - left) / chartH, green, "#12352c"), color: green });
-  const timeY = chartY + chartH + 8 * u;
-  f.add("time", "main", right - 300 * u, timeY, 300 * u, 30 * u, { font: MONO, size: 20, weight: 500, color: soft, align: "right" });
-  const captionsY = timeY + 30 * u + 20 * u;
-  f.add("captions", "main", left, captionsY, right - left, rowY - 32 * u - captionsY, captions);
+  stack(a.top, a.bottom, [
+    ...head,
+    label(f, c, "kicker", "The interview", kicker, f.by({ square: 26, portrait: 34, story: 50, landscape: 0 })),
+    heading(f, c, title, 2, 8),
+    credit(c, f.by({ square: 60, portrait: 72, story: 86, landscape: 0 }), 18),
+    rule(f, a.cx, "rule-story", a.w, ink, 1, 16),
+    space(),
+    label(f, c, "quote", "“", quote),
+    captions(f, c, words, 2),
+    space(1.4),
+    rule(f, a.cx, "rule-foot", a.w, ink, 1, 10),
+    {
+      h: f.by({ square: 44, portrait: 56, story: 70, landscape: 0 }) * f.unit,
+      gap: 14 * f.unit,
+      draw: (y, h) => {
+        const w = 360 * f.unit;
+        f.add("visual", "main", a.left, y, w, h, { visual: "bars", color: ink });
+        f.add("time", "main", a.right - 300 * f.unit, y, 300 * f.unit, h, { ...time, align: "right" });
+      },
+    },
+  ]);
+});
+
+/** Royal purple and gold: three fleurs-de-lis over a decorative title, the speaker in a ring of fine gold. */
+const imperialPurple = template("imperial-purple", "Imperial Purple", { color: "#3d1764", to: "#16072a", angle: 180 }, DUSK, (f) => {
+  const a = area(f);
+  const ivory = "#f5ecdb";
+  const soft = "#b9a6d6";
+  frameBorder(f, f.pad * 0.36, { gap: 10, outer: 2, inner: 1, jewels: "sides" }, GOLD, 0.9);
+  const title: Style = { font: CINZEL_DECO, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 50 }), weight: 700, color: GOLD, lineHeight: 1.16, enter: "glide", loop: "shimmer" };
+  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: soft, uppercase: true, letterSpacing: 420 };
+  const name: Style = { font: CINZEL, size: 27, weight: 600, color: ivory, letterSpacing: 80 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.28 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: rings([196, 2], [184, 1], [172, 1]), scale: 1.32, loop: "slowZoom" };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+  const lilies = (cx: number, w: number, gap = 0): Block => {
+    const art = fleurDeLis();
+    const big = w * f.unit;
+    const small = big * 0.62;
+    const h = (big * art.h) / art.w;
+    return {
+      h,
+      gap,
+      draw: (y) => {
+        const smallH = (small * art.h) / art.w;
+        f.add("graphic", "lily-left", cx - big * 1.5 - small / 2, y + h - smallH, small, smallH, { art, color: GOLD });
+        f.add("graphic", "lily", cx - big / 2, y, big, h, { art, color: GOLD, enter: "rise" });
+        f.add("graphic", "lily-right", cx + big * 1.5 - small / 2, y + h - smallH, small, smallH, { art, color: GOLD });
+      },
+    };
+  };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 40, f.width * 0.4);
+    const right = columnOf(f.width * 0.45, a.right - 40);
+    stack(a.top, a.bottom, [lilies(left.x + left.w / 2, 100), cameo(f, left.x + left.w / 2, 240, frame, 40), names(f, left, name, handle, 30)]);
+    upright(f, "seam", f.width * 0.425, a.top + 40, a.bottom - 40, GOLD, 0.5);
+    stack(a.top, a.bottom, [label(f, right, "kicker", "Episode XII", kicker), heading(f, right, title, 2, 16), ornament(f, right.x + right.w / 2, "divider", divider(), 400, { color: GOLD }, 16), space(), captions(f, right, words, 3, 16), space(), sound(f, right.x + right.w / 2, 500, 64, { color: GOLD }, 16), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 20, a.right - 20);
+  stack(a.top, a.bottom, [
+    lilies(a.cx, f.by({ square: 80, portrait: 100, story: 120, landscape: 0 })),
+    label(f, c, "kicker", "Episode XII", kicker, 20),
+    heading(f, c, title, 2, 12),
+    cameo(f, a.cx, f.by({ square: 104, portrait: 150, story: 214, landscape: 0 }), frame, f.by({ square: 20, portrait: 32, story: 50, landscape: 0 })),
+    names(f, c, name, handle, 16),
+    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 22, story: 38, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 44, portrait: 58, story: 78, landscape: 0 }), { color: GOLD }, 14),
+    clock(f, c, time, 10),
+  ]);
+});
+
+/** A champagne toast: a warm gold page, a script greeting, sparkles at the corners and bubbles rising. */
+const champagneToast = template("champagne-toast", "Champagne Toast", { color: "#f4e9d0", to: "#d9c08e", angle: 165 }, PAPER, (f) => {
+  const a = area(f);
+  const brown = "#3a2914";
+  const soft = "#7a6142";
+  const script: Style = { font: VIBES, size: f.by({ square: 60, portrait: 70, story: 82, landscape: 72 }), color: "#8a6420", lineHeight: 1.25, enter: "fade" };
+  const title: Style = { font: ITALIANA, size: f.by({ square: 48, portrait: 48, story: 48, landscape: 60 }), color: brown, uppercase: true, lineHeight: 1.12, letterSpacing: 90, enter: "glide" };
+  const name: Style = { font: TENOR, size: 22, color: brown, uppercase: true, letterSpacing: 300 };
+  // On a page this light, the rule and the sound take a deep flat gold; the polished one would fade into it.
+  const deepGold = "#8a6420";
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
+  const words: Style = { font: GILDA, size: f.by({ square: 60, portrait: 66, story: 76, landscape: 64 }), color: brown, highlight: brown, lineHeight: 1.34 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: rings([196, 1.5]), scale: 1.22 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
+  const glint = f.by({ square: 110, portrait: 130, story: 160, landscape: 140 });
+  f.add("graphic", "sparkles", a.right - glint * 0.9, a.top - glint * 0.35, glint, glint, { art: sparkles(), color: GOLD, loop: "pulse", speed: 0.5 });
+  f.add("graphic", "sparkles-low", a.left - glint * 0.1, a.bottom - glint * 0.65, glint * 0.7, glint * 0.7, { art: sparkles(), color: GOLD, flipX: true, loop: "pulse", speed: 0.4 });
+  // A few bubbles drifting up one side, each its own size and pace.
+  [[0.08, 0.62, 18], [0.12, 0.5, 11], [0.06, 0.4, 8], [0.92, 0.7, 14], [0.9, 0.56, 9]].forEach(([x, y, r], index) => {
+    const side = r * 2 * f.unit;
+    f.add("shape", `bubble-${index + 1}`, f.width * x - side / 2, f.height * y, side, side, { shape: "ellipse", fill: "#fffaf0", opacity: 0.55, loop: "float", speed: 0.4 + index * 0.08 });
+  });
+
+  if (f.wide) {
+    const left = columnOf(a.left + 60, f.width * 0.42);
+    const right = columnOf(f.width * 0.46, a.right - 80);
+    stack(a.top, a.bottom, [label(f, left, "script", "A toast to", script), heading(f, left, title, 2, 0), ornament(f, left.x + left.w / 2, "rule", taperedRule(), 340, { color: deepGold }, 24), cameo(f, left.x + left.w / 2, 150, frame, 30), names(f, left, name, handle, 18)]);
+    stack(a.top, a.bottom, [space(), captions(f, right, words, 4), space(), sound(f, right.x + right.w / 2, 480, 64, { color: deepGold }, 24), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 40, a.right - 40);
+  stack(a.top, a.bottom, [
+    label(f, c, "script", "A toast to", script),
+    heading(f, c, title, 2, 0),
+    ornament(f, a.cx, "rule", taperedRule(), f.by({ square: 300, portrait: 340, story: 400, landscape: 0 }), { color: deepGold }, 16),
+    space(), captions(f, c, words, 3, f.by({ square: 12, portrait: 22, story: 36, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 72, landscape: 0 }), { color: deepGold }, 12),
+    cameo(f, a.cx, f.by({ square: 84, portrait: 116, story: 160, landscape: 0 }), frame, f.by({ square: 20, portrait: 30, story: 46, landscape: 0 })),
+    names(f, c, name, handle, 12),
+    clock(f, c, time, 8),
+  ]);
+});
+
+/** A film still in black and silver: a title card over the speaker in a spotlight, the words between two hairlines
+ *  running edge to edge like subtitles on the screen, and the speaker billed underneath. */
+const noirCinema = template("noir-cinema", "Noir Cinema", { color: "#1e1f23", to: "#050506", angle: 180 }, INK, (f) => {
+  const a = area(f);
+  const white = "#f2f2f0";
+  const soft = "#9a9ca3";
+  const kicker: Style = { font: TENOR, size: 22, color: SILVER, uppercase: true, letterSpacing: 520 };
+  const title: Style = { font: BODONI, size: f.by({ square: 50, portrait: 50, story: 50, landscape: 56 }), weight: 700, color: SILVER, uppercase: true, lineHeight: 1.08, letterSpacing: 40, enter: "glide", loop: "shimmer" };
+  const billing: Style = { font: TENOR, size: 19, color: soft, uppercase: true, letterSpacing: 520 };
+  const name: Style = { font: BODONI, size: 30, weight: 600, color: white, uppercase: true, letterSpacing: 240 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 180 };
+  const words: Style = { font: INSTRUMENT, size: f.by({ square: 72, portrait: 80, story: 88, landscape: 80 }), color: white, highlight: "#dfe3e8", lineHeight: 1.22 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 220 };
+  const spotlight = (cx: number, cy: number, d: number) => {
+    const rays = d * 2.4 * f.unit;
+    f.add("graphic", "rays", cx - rays / 2, cy - rays / 2, rays, rays, { art: sunburst(), color: SILVER, opacity: 0.24 });
+    cameoAt(f, cx, cy, d, { rim: SILVER, rimWidth: 4 });
+  };
+  const burst = (cx: number, d: number, gap = 0): Block => {
+    const h = d * 1.5 * f.unit;
+    return { h, gap: gap * f.unit, draw: (y) => spotlight(cx, y + h / 2, d) };
+  };
+  // The screen: two silver hairlines across the whole frame and the words between them.
+  const screen = (c: Column, count: number, inset: number, gap = 0): Block => {
+    const lines = captions(f, c, words, count);
+    const pad = inset * f.unit;
+    const h = lines.h + pad * 2;
+    const edge = (name: string, y: number) => f.add("shape", name, 0, y - 4 * f.unit, f.width, 8 * f.unit, { shape: "line", fill: SILVER, strokeWidth: 1.5, opacity: 0.75, enter: "unfold" });
+    return {
+      h,
+      gap: gap * f.unit,
+      draw: (y) => {
+        edge("screen-top", y);
+        edge("screen-foot", y + h);
+        lines.draw(y + pad, lines.h);
+      },
+    };
+  };
+
+  if (f.wide) {
+    const c = columnOf(a.left, a.right);
+    const rowH = 150 * f.unit;
+    stack(a.top, a.bottom, [
+      label(f, c, "kicker", "The late show", kicker),
+      heading(f, c, title, 1, 12),
+      space(),
+      screen(columnOf(a.left + 80, a.right - 80), 2, 44),
+      space(),
+      {
+        h: rowH,
+        gap: 0,
+        draw: (y) => {
+          spotlight(a.left + 120 * f.unit, y + rowH / 2, 104);
+          const x = a.left + 230 * f.unit;
+          const billH = f.lines(19, 1, 1.4);
+          const nameH = f.lines(30, 1, 1.35);
+          const handleH = f.lines(22, 1, 1.3);
+          const top = y + (rowH - billH - nameH - handleH) / 2;
+          f.add("text", "billing", x, top, 520 * f.unit, billH, { text: "Starring", align: "left", lineHeight: 1.4, ...billing });
+          f.add("name", "main", x, top + billH, 640 * f.unit, nameH, { ...name, align: "left" });
+          f.add("handle", "main", x, top + billH + nameH, 640 * f.unit, handleH, { ...handle, align: "left" });
+          const barsW = 420 * f.unit;
+          f.add("visual", "main", a.right - barsW, y + rowH / 2 - 40 * f.unit, barsW, 56 * f.unit, { visual: "bars", color: SILVER });
+          f.add("time", "main", a.right - barsW, y + rowH / 2 + 26 * f.unit, barsW, f.lines(20, 1, 1.4), { ...time, align: "right" });
+        },
+      },
+    ]);
+    return;
+  }
+  const c = columnOf(a.left + 30, a.right - 30);
+  stack(a.top, a.bottom, [
+    label(f, c, "kicker", "The late show", kicker),
+    burst(a.cx, f.by({ square: 86, portrait: 120, story: 170, landscape: 0 }), f.by({ square: 6, portrait: 14, story: 30, landscape: 0 })),
+    heading(f, c, title, 2, f.by({ square: 4, portrait: 10, story: 24, landscape: 0 })),
+    space(),
+    screen(c, 2, f.by({ square: 26, portrait: 36, story: 50, landscape: 0 })),
+    space(),
+    label(f, c, "billing", "Starring", billing),
+    names(f, c, name, handle, 2),
+    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 40, portrait: 54, story: 72, landscape: 0 }), { color: SILVER }, f.by({ square: 16, portrait: 26, story: 40, landscape: 0 })),
+    clock(f, c, time, 8),
+  ]);
+});
+
+/** A prize lecture on parchment: the speaker crowned in a gold laurel wreath, navy ink, an engraved rule. */
+const laureate = template("laureate", "Laureate", { color: "#f4eddd", to: "#e7dcc4", angle: 180 }, PAPER, (f) => {
+  const a = area(f);
+  const navy = "#14213d";
+  const soft = "#5d6478";
+  const deepGold = "#9a7b3c";
+  frameBorder(f, f.pad * 0.4, { gap: 8, outer: 1.5, inner: 1, corner: "round", cut: 26 }, navy, 0.75);
+  const kicker: Style = { font: CINZEL, size: 22, weight: 700, color: "#8a6a2f", uppercase: true, letterSpacing: 380 };
+  const title: Style = { font: CORMORANT, size: f.by({ square: 56, portrait: 64, story: 66, landscape: 62 }), weight: 600, color: navy, lineHeight: 1.06, enter: "glide" };
+  const name: Style = { font: CINZEL, size: 26, weight: 700, color: navy, letterSpacing: 100 };
+  const handle: Style = { font: CORMORANT, size: 24, weight: 600, color: soft };
+  const words: Style = { font: BASKERVILLE, size: f.by({ square: 48, portrait: 54, story: 64, landscape: 52 }), color: navy, highlight: navy, lineHeight: 1.45 };
+  const frame: CameoStyle = { halo: laurelWreath(), scale: 1.6, haloColor: GOLD, rim: GOLD, rimWidth: 3, loop: "slowZoom" };
+  const time: Style = { font: CINZEL, size: 20, weight: 600, color: soft, letterSpacing: 260 };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 40, f.width * 0.42);
+    const right = columnOf(f.width * 0.47, a.right - 60);
+    stack(a.top, a.bottom, [cameo(f, left.x + left.w / 2, 270, frame), names(f, left, name, handle, 20)]);
+    stack(a.top, a.bottom, [label(f, right, "kicker", "The laureate lecture", kicker), heading(f, right, title, 2, 14), ornament(f, right.x + right.w / 2, "rule", taperedRule(), 380, { color: deepGold }, 18), space(), captions(f, right, words, 4, 18), space(), sound(f, right.x + right.w / 2, 460, 56, { color: navy }, 18), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 40, a.right - 40);
+  stack(a.top, a.bottom, [
+    label(f, c, "kicker", "The laureate lecture", kicker),
+    heading(f, c, title, 2, 14),
+    cameo(f, a.cx, f.by({ square: 128, portrait: 196, story: 260, landscape: 0 }), frame, f.by({ square: 12, portrait: 24, story: 44, landscape: 0 })),
+    names(f, c, name, handle, 8),
+    ornament(f, a.cx, "rule", taperedRule(), f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), { color: deepGold }, 16),
+    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 18, story: 32, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 300, portrait: 360, story: 420, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 64, landscape: 0 }), { color: navy }, 12),
+    clock(f, c, time, 10),
+  ]);
+});
+
+/** A reading room in green morocco: gilt bands as on a book's spine, a chapter opening with its numeral in gold, the
+ *  words set as the page, and the speaker named at its foot as on a bookplate. */
+const library = template("the-library", "The Library", { color: "#203528", to: "#0e1b14", angle: 180 }, MINT, (f) => {
+  const a = area(f);
+  const cream = "#f1e7cf";
+  const soft = "#a7c0ad";
+  const band = (name: string, y: number) => f.add("graphic", name, 0, y, f.width, 64 * f.unit, { art: spineBand(f.width), color: GOLD, opacity: 0.95 });
+  const numeral: Style = { font: CINZEL, size: f.by({ square: 76, portrait: 96, story: 110, landscape: 104 }), weight: 500, color: GOLD, lineHeight: 1.05, enter: "fade" };
+  const kicker: Style = { font: TENOR, size: 22, color: GOLD, uppercase: true, letterSpacing: 400 };
+  const title: Style = { font: CORMORANT, size: f.by({ square: 56, portrait: 64, story: 66, landscape: 60 }), weight: 700, color: cream, lineHeight: 1.06, enter: "glide" };
+  const name: Style = { font: CORMORANT, size: 32, weight: 700, color: cream };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
+  const words: Style = { font: BASKERVILLE, size: f.by({ square: 48, portrait: 54, story: 62, landscape: 52 }), color: cream, highlight: "#d9b45a", lineHeight: 1.45 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 4 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
+  const topBand = f.tall ? f.height * 0.08 : f.pad * 0.55;
+  const footBand = f.tall ? f.height * 0.87 : f.height - f.pad * 0.55 - 64 * f.unit;
+  band("band-top", topBand);
+  band("band-foot", footBand);
+  const top = topBand + 64 * f.unit + f.by({ square: 30, portrait: 44, story: 60, landscape: 40 });
+  const bottom = footBand - f.by({ square: 26, portrait: 40, story: 60, landscape: 34 });
+  // The foot of the page: the bookplate on the left, the time on the right like a folio.
+  const foot = (c: Column, d: number, gap = 0): Block => {
+    const plate = byline(f, c.x, c.w * 0.6, d, name, handle, frame);
+    const timeH = f.lines(20, 1, 1.4);
+    return {
+      h: plate.h,
+      gap: gap * f.unit,
+      draw: (y) => {
+        plate.draw(y, plate.h);
+        f.add("time", "main", c.x + c.w * 0.6, y + plate.h / 2 - timeH / 2, c.w * 0.4, timeH, { ...time, align: "right" });
+      },
+    };
+  };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 40, f.width * 0.4);
+    const right = columnOf(f.width * 0.47, a.right - 40);
+    stack(top, bottom, [label(f, left, "numeral", "XII", numeral), label(f, left, "kicker", "From the reading room", kicker, 10), heading(f, left, title, 2, 18), rule(f, left.x + left.w / 2, "rule", 90, GOLD, 2, 18)]);
+    upright(f, "seam", f.width * 0.435, top, bottom, GOLD, 0.45);
+    stack(top, bottom, [space(), captions(f, right, words, 4), space(), sound(f, right.x + right.w / 2, 460, 56, { color: GOLD }, 20), foot(right, 92, 26)]);
+    return;
+  }
+  const c = columnOf(a.left + 20, a.right - 20);
+  stack(top, bottom, [
+    label(f, c, "numeral", "XII", numeral),
+    label(f, c, "kicker", "From the reading room", kicker, 6),
+    heading(f, c, title, 2, 14),
+    rule(f, a.cx, "rule", 90, GOLD, 2, 8),
+    space(), captions(f, c, words, 3), space(),
+    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 36, portrait: 48, story: 66, landscape: 0 }), { color: GOLD }),
+    foot(c, f.by({ square: 76, portrait: 88, story: 104, landscape: 0 }), f.by({ square: 18, portrait: 28, story: 44, landscape: 0 })),
+  ]);
+});
+
+/** A sapphire gala night: silver wings over a fine title, the speaker in a ring of beads, a scatter of light. */
+const sapphireGala = template("sapphire-gala", "Sapphire Gala", { color: "#163b93", to: "#06143d", angle: 165 }, DUSK, (f) => {
+  const a = area(f);
+  const white = "#f4f6fb";
+  const soft = "#a9b8de";
+  const kicker: Style = { font: TENOR, size: 22, color: SILVER, uppercase: true, letterSpacing: 520 };
+  const title: Style = { font: ITALIANA, size: f.by({ square: 52, portrait: 52, story: 52, landscape: 54 }), color: SILVER, uppercase: true, lineHeight: 1.1, letterSpacing: 80, enter: "glide", loop: "shimmer" };
+  const name: Style = { font: ITALIANA, size: 30, color: white, uppercase: true, letterSpacing: 200 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 160 };
+  const words: Style = { font: PLAYFAIR, size: f.by({ square: 56, portrait: 64, story: 74, landscape: 62 }), weight: 500, color: white, highlight: "#dbe4f5", lineHeight: 1.32 };
+  const frame: CameoStyle = { rim: SILVER, rimWidth: 4, halo: beadRing(), scale: 1.32 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 200 };
+  const glint = f.by({ square: 70, portrait: 84, story: 100, landscape: 90 });
+  f.add("graphic", "sparkle-a", a.left, a.top + glint * 0.2, glint, glint, { art: sparkles(), color: SILVER, opacity: 0.8, loop: "pulse", speed: 0.5 });
+  f.add("graphic", "sparkle-b", a.right - glint * 0.8, a.bottom - glint * 1.1, glint * 0.8, glint * 0.8, { art: sparkles(), color: SILVER, opacity: 0.7, flipX: true, loop: "pulse", speed: 0.4 });
+
+  if (f.wide) {
+    const left = columnOf(a.left + 80, f.width * 0.42);
+    const right = columnOf(f.width * 0.47, a.right - 60);
+    stack(a.top, a.bottom, [cameo(f, left.x + left.w / 2, 240, frame), names(f, left, name, handle, 30)]);
+    stack(a.top, a.bottom, [ornament(f, right.x + right.w / 2, "wings", decoWings(), 380, { color: SILVER }), label(f, right, "kicker", "Gala evening", kicker, 20), heading(f, right, title, 2, 12), space(), captions(f, right, words, 3, 22), space(), sound(f, right.x + right.w / 2, 500, 60, { color: SILVER }, 18), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 30, a.right - 30);
+  stack(a.top, a.bottom, [
+    ornament(f, a.cx, "wings", decoWings(), f.by({ square: 300, portrait: 360, story: 440, landscape: 0 }), { color: SILVER, enter: "unfold" }),
+    label(f, c, "kicker", "Gala evening", kicker, 18),
+    heading(f, c, title, 2, 12),
+    cameo(f, a.cx, f.by({ square: 100, portrait: 146, story: 210, landscape: 0 }), frame, f.by({ square: 20, portrait: 32, story: 50, landscape: 0 })),
+    names(f, c, name, handle, 14),
+    space(), captions(f, c, words, 3, f.by({ square: 10, portrait: 22, story: 38, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 42, portrait: 56, story: 76, landscape: 0 }), { color: SILVER }, 14),
+    clock(f, c, time, 10),
+  ]);
+});
+
+/** Peacock teal and gold: the speaker held in an oval cartouche like a locket, the words beneath. */
+const cartoucheFrame = template("cartouche", "Cartouche", { color: "#0f444c", to: "#052127", angle: 180 }, MINT, (f) => {
+  const a = area(f);
+  const ivory = "#f3ead6";
+  const soft = "#9cc7c4";
+  const kicker: Style = { font: CINZEL, size: 22, weight: 600, color: GOLD, uppercase: true, letterSpacing: 420 };
+  const title: Style = { font: CINZEL, size: f.by({ square: 42, portrait: 50, story: 50, landscape: 50 }), weight: 600, color: ivory, lineHeight: 1.14, letterSpacing: 30, enter: "glide" };
+  const name: Style = { font: CINZEL, size: 26, weight: 600, color: ivory, letterSpacing: 80 };
+  const handle: Style = { font: TENOR, size: 22, color: soft, letterSpacing: 140 };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: ivory, highlight: "#e2c27a", lineHeight: 1.28 };
+  const time: Style = { font: TENOR, size: 20, color: soft, letterSpacing: 160 };
+  // The oval's inner ring runs 240 by 340 of its 300 by 400, so the round photo sits in it with sky above and below.
+  const locket = (cx: number, w: number, gap = 0): Block => {
+    const art = cartouche();
+    const width = w * f.unit;
+    const h = (width * art.h) / art.w;
+    return {
+      h,
+      gap: gap * f.unit,
+      draw: (y) => {
+        f.add("graphic", "cartouche", cx - width / 2, y, width, h, { art, color: GOLD, enter: "iris" });
+        const d = w * 0.66;
+        const rim = 4 * f.unit;
+        f.add("shape", "rim", cx - (d * f.unit) / 2 - rim, y + h / 2 - (d * f.unit) / 2 - rim, d * f.unit + rim * 2, d * f.unit + rim * 2, { shape: "ellipse", fill: GOLD });
+        f.add("avatar", "main", cx - (d * f.unit) / 2, y + h / 2 - (d * f.unit) / 2, d * f.unit, d * f.unit);
+      },
+    };
+  };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 40, f.width * 0.4);
+    const right = columnOf(f.width * 0.45, a.right - 60);
+    stack(a.top, a.bottom, [locket(left.x + left.w / 2, 330), names(f, left, name, handle, 24)]);
+    upright(f, "seam", f.width * 0.425, a.top + 40, a.bottom - 40, GOLD, 0.5);
+    stack(a.top, a.bottom, [label(f, right, "kicker", "Episode XII", kicker), heading(f, right, title, 2, 16), ornament(f, right.x + right.w / 2, "scroll", scrollDivider(), 380, { color: GOLD }, 16), space(), captions(f, right, words, 3, 16), space(), sound(f, right.x + right.w / 2, 500, 60, { color: GOLD }, 16), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 20, a.right - 20);
+  stack(a.top, a.bottom, [
+    label(f, c, "kicker", "Episode XII", kicker),
+    heading(f, c, title, 2, 12),
+    locket(a.cx, f.by({ square: 176, portrait: 250, story: 330, landscape: 0 }), f.by({ square: 18, portrait: 30, story: 50, landscape: 0 })),
+    names(f, c, name, handle, 14),
+    space(), captions(f, c, words, 3, f.by({ square: 8, portrait: 20, story: 36, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 340, portrait: 400, story: 460, landscape: 0 }), f.by({ square: 42, portrait: 56, story: 76, landscape: 0 }), { color: GOLD }, 14),
+    clock(f, c, time, 10),
+  ]);
+});
+
+/** A gilded salon in white and gold: scrolled corners, a decorative title in warm umber, a scroll beneath it. */
+const baroque = template("baroque", "Baroque", { color: "#f9f5ec", to: "#ece2cf", angle: 180 }, PAPER, (f) => {
+  const a = area(f);
+  const umber = "#3b2a1a";
+  const soft = "#7d6a55";
+  const deepGold = "#8a6a2f";
+  const edge = f.pad * 0.3;
+  corners(f, flourishCorner(), edge, edge, f.width - edge * 2, f.height - edge * 2, f.by({ square: 200, portrait: 220, story: 250, landscape: 220 }), { color: GOLD });
+  const kicker: Style = { font: CINZEL, size: 22, weight: 700, color: "#8a6a2f", uppercase: true, letterSpacing: 420 };
+  const title: Style = { font: CINZEL_DECO, size: f.by({ square: 44, portrait: 52, story: 52, landscape: 52 }), weight: 700, color: umber, lineHeight: 1.16, enter: "glide" };
+  const name: Style = { font: CINZEL, size: 26, weight: 700, color: umber, letterSpacing: 80 };
+  const handle: Style = { font: CORMORANT, size: 24, weight: 600, color: soft };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 68, portrait: 78, story: 90, landscape: 76 }), weight: 700, color: umber, highlight: deepGold, lineHeight: 1.28 };
+  const frame: CameoStyle = { rim: GOLD, rimWidth: 5, halo: rings([196, 2], [184, 1]), scale: 1.28, loop: "slowZoom" };
+  const time: Style = { font: CINZEL, size: 20, weight: 700, color: soft, letterSpacing: 260 };
+
+  if (f.wide) {
+    const left = columnOf(a.left + 80, f.width * 0.42);
+    const right = columnOf(f.width * 0.47, a.right - 100);
+    stack(a.top + 20, a.bottom - 20, [cameo(f, left.x + left.w / 2, 250, frame), names(f, left, name, handle, 26)]);
+    stack(a.top + 20, a.bottom - 20, [label(f, right, "kicker", "Episode XII", kicker), heading(f, right, title, 2, 14), ornament(f, right.x + right.w / 2, "scroll", scrollDivider(), 420, { color: GOLD }, 14), space(), captions(f, right, words, 3, 16), space(), sound(f, right.x + right.w / 2, 480, 56, { color: deepGold }, 16), clock(f, right, time, 10)]);
+    return;
+  }
+  const c = columnOf(a.left + 40, a.right - 40);
+  stack(a.top + f.by({ square: 30, portrait: 40, story: 0, landscape: 0 }), a.bottom - f.by({ square: 20, portrait: 30, story: 0, landscape: 0 }), [
+    label(f, c, "kicker", "Episode XII", kicker),
+    heading(f, c, title, 2, 12),
+    ornament(f, a.cx, "scroll", scrollDivider(), f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), { color: GOLD }, 12),
+    cameo(f, a.cx, f.by({ square: 96, portrait: 140, story: 200, landscape: 0 }), frame, f.by({ square: 18, portrait: 30, story: 48, landscape: 0 })),
+    names(f, c, name, handle, 14),
+    space(), captions(f, c, words, 3, f.by({ square: 6, portrait: 18, story: 34, landscape: 0 })), space(),
+    sound(f, a.cx, f.by({ square: 320, portrait: 380, story: 440, landscape: 0 }), f.by({ square: 38, portrait: 52, story: 70, landscape: 0 }), { color: deepGold }, 12),
+    clock(f, c, time, 8),
+  ]);
+});
+
+/** Nothing to prove: stone and espresso, a fine serif, wide-set capitals and a single hairline. */
+const quietLuxury = template("quiet-luxury", "Quiet Luxury", { color: "#e6e0d6" }, PAPER, (f) => {
+  const a = area(f, 1.15);
+  const espresso = "#2b2520";
+  const taupe = "#7b7064";
+  const small: Style = { font: TENOR, size: 20, color: taupe, uppercase: true, letterSpacing: 420 };
+  const title: Style = { font: CORMORANT, size: f.by({ square: 72, portrait: 80, story: 80, landscape: 76 }), weight: 500, color: espresso, lineHeight: 1.04, align: "left", enter: "glide" };
+  const name: Style = { font: TENOR, size: 18, color: espresso, uppercase: true, letterSpacing: 320, align: "left" };
+  const handle: Style = { font: CORMORANT, size: 24, weight: 500, color: taupe, align: "left" };
+  const words: Style = { font: CORMORANT, size: f.by({ square: 66, portrait: 76, story: 88, landscape: 74 }), weight: 600, color: espresso, highlight: espresso, lineHeight: 1.26, align: "left" };
+  const time: Style = { font: TENOR, size: 20, color: taupe, letterSpacing: 300 };
+  const c = columnOf(a.left, a.right);
+  // A plain photo, no rim: nothing here needs to announce itself.
+  const signature = (col: Column, d: number, gap = 0) => byline(f, col.x, col.w * 0.7, d, name, handle, {}, gap);
+
+  if (f.wide) {
+    const left = columnOf(a.left, f.width * 0.47);
+    const right = columnOf(f.width * 0.53, a.right);
+    stack(a.top, a.bottom, [pair(f, columnOf(a.left, a.right), ["series", "number"], ["In conversation", "No. 12"], small), space(), heading(f, left, title, 3), space(), signature(left, 76)]);
+    stack(a.top + 90, a.bottom, [space(), captions(f, right, words, 4, 0, 0), space(), rule(f, right.x + right.w / 2, "rule", right.w / f.unit, taupe, 1, 10), {
+      h: 48 * f.unit,
+      gap: 18 * f.unit,
+      draw: (y, h) => {
+        f.add("visual", "main", right.x, y, 260 * f.unit, h, { visual: "bars", color: taupe });
+        f.add("time", "main", right.x + right.w - 260 * f.unit, y, 260 * f.unit, h, { ...time, align: "right" });
+      },
+    }]);
+    return;
+  }
+  stack(a.top, a.bottom, [
+    pair(f, c, ["series", "number"], ["In conversation", "No. 12"], small),
+    space(f.by({ square: 0.4, portrait: 0.6, story: 0.8, landscape: 0 })),
+    heading(f, c, title, 2),
+    rule(f, a.left + 60 * f.unit, "rule", 120, taupe, 1, 26),
+    space(0.5),
+    captions(f, c, words, 3, 0, 0),
+    space(1),
+    {
+      h: 44 * f.unit,
+      gap: 0,
+      draw: (y, h) => {
+        f.add("visual", "main", a.left, y, 240 * f.unit, h, { visual: "bars", color: taupe });
+        f.add("time", "main", a.right - 260 * f.unit, y, 260 * f.unit, h, { ...time, align: "right" });
+      },
+    },
+    rule(f, a.cx, "rule-foot", a.w / f.unit, taupe, 1, 22),
+    signature(c, f.by({ square: 68, portrait: 76, story: 88, landscape: 0 }), 22),
+  ]);
 });
 
 /** The podcast templates in the order the picker shows them. */
 export const PODCAST_TEMPLATES: TemplateChoice[] = [
-  studioDark,
-  cleanWhite,
-  bigCaptions,
-  boldQuote,
-  neonNight,
-  sunrise,
-  newsroom,
-  minimalMono,
-  retroRadio,
-  splitPhoto,
-  twoGuests,
-  bigWaveform,
-  pastelCard,
-  magazineCover,
-  techTalk,
-  coffeeChat,
-  lecture,
-  sportsDesk,
-  wellness,
-  financeBrief,
+  royalCrest,
+  gildedFrame,
+  emeraldSalon,
+  bordeaux,
+  gatsbyDeco,
+  ivoryLetterpress,
+  marbleGold,
+  midnightOpera,
+  heritageBroadcast,
+  monogram,
+  gazette,
+  imperialPurple,
+  champagneToast,
+  noirCinema,
+  laureate,
+  library,
+  sapphireGala,
+  cartoucheFrame,
+  baroque,
+  quietLuxury,
 ];

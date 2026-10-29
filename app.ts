@@ -1,10 +1,10 @@
-import { audiogram, type Editor, type LibraryItem, type Settings, type StockPhoto } from "@drkxbt/audiogram";
+import { audiogram, type Editor, type Settings, type StockPhoto } from "@drkxbt/audiogram";
 import { isSilent, SPEECH_RATE } from "./audio.js";
 import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
 import { credit } from "./credit.js";
 import { dropHallucinations, mergeCues, wordsToCues } from "./cues.js";
-import { fitPicture, loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
+import { dataUrlBlob, loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
 import type { FontEntry } from "./fonts.js";
 
 /** A photo as photos.json lists it, its files relative to the photos folder. */
@@ -129,11 +129,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   let savedTimer = 0;
   const shrunk = new WeakMap<Blob, Promise<string>>();
 
-  // Each picture is kept small: the cover as a 256 px square, a background up to 1280 px.
-  const shrinkers = {
-    cover: (blob: Blob) => shrinkCover(blob),
-    background: (blob: Blob) => fitPicture(blob, 1280, "image/jpeg"),
-  };
+  // The cover is kept small, as a 256 px square. A background is a layer of its design now, its picture kept with the
+  // rest of the uploads.
 
   // Pictures are kept once the ones from last time are back, so an early change can't let them go.
   let picturesBack = false;
@@ -141,15 +138,13 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   async function keep(next: Settings) {
     // The pictures as they are now, not as they were when this save was asked for.
     if (picturesBack) void savePictures(editor.settings.images);
-    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers, page: next.page };
+    const entry: Kit = { title: next.title, speaker: next.speaker, handle: next.handle, links: next.links, layout: next.layout, visual: next.visual, musicVolume: next.musicVolume, layers: next.layers, page: next.page, recent: next.recent };
     if (typeof next.theme === "number") entry.theme = next.theme;
-    for (const field of ["cover", "background"] as const) {
-      const picture = next[field];
-      if (picture instanceof Blob) {
-        if (!shrunk.has(picture)) shrunk.set(picture, shrinkers[field](picture));
-        entry[field] = await shrunk.get(picture)!.catch(() => undefined);
-      } else if (typeof picture === "string" && picture.startsWith("data:image/")) entry[field] = picture;
-    }
+    const picture = next.cover;
+    if (picture instanceof Blob) {
+      if (!shrunk.has(picture)) shrunk.set(picture, shrinkCover(picture));
+      entry.cover = await shrunk.get(picture)!.catch(() => undefined);
+    } else if (typeof picture === "string" && picture.startsWith("data:image/")) entry.cover = picture;
     saveKit(entry);
   }
 
@@ -160,11 +155,16 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   const blank = !legacy || (!kit.layers && !kit.background);
   const editor = audiogram(stage, {
     ...kit,
+    // A background kept from before backgrounds were layers goes to the editor as a picture it can store, once; the
+    // next save keeps it as a layer and no longer in the kit.
+    background: kit.background ? dataUrlBlob(kit.background) ?? undefined : undefined,
     blank,
     templates: PODCAST_TEMPLATES,
     page: legacy ? (blank ? undefined : null) : kit.page,
     theme: legacy && blank ? undefined : kit.theme,
     overlay: credit,
+    // A recording added to the clip has its captions written as soon as it is in, the way the first one does.
+    onRecordings: () => (autoTranscribe && ready() && !running && !warning ? void work() : update()),
     onChange: (next) => {
       clearTimeout(savedTimer);
       savedTimer = window.setTimeout(() => void keep(next), 500);
@@ -202,22 +202,19 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   void loadPictures().then(async (pictures) => {
     if (Object.keys(pictures).length) await editor.setImages(pictures);
     picturesBack = true;
+    // A save made while the stored pictures were still coming back left them out; this one keeps them, a background
+    // brought over from an older kit among them.
+    void keep(editor.settings);
   });
-  // Graphics, stickers and free photos, bundled next to the app, read once the page has settled so they never hold
-  // up the editor.
-  const libraryAt = new URL("./library/", import.meta.url);
+  // The free photos, bundled next to the app, read once the page has settled so they never hold up the editor.
   const photosAt = new URL("./photos/", import.meta.url);
-  const readJson = <T>(url: URL): Promise<T | null> => fetch(url).then((response) => (response.ok ? (response.json() as Promise<T>) : null)).catch(() => null);
   setTimeout(() => {
-    void Promise.all([
-      readJson<{ items: LibraryItem[] }>(new URL("graphics.json", libraryAt)),
-      readJson<{ items: LibraryItem[] }>(new URL("stickers.json", libraryAt)),
-      readJson<PhotoEntry[]>(new URL("photos.json", photosAt)),
-    ]).then(([graphics, stickers, photos]) => editor.setLibrary({
-      graphics: graphics?.items ?? [],
-      stickers: stickers?.items ?? [],
-      photos: (photos ?? []).map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
-    }));
+    void fetch(new URL("photos.json", photosAt))
+      .then((response) => (response.ok ? (response.json() as Promise<PhotoEntry[]>) : []))
+      .catch((): PhotoEntry[] => [])
+      .then((photos) => editor.setLibrary({
+        photos: photos.map((photo) => ({ ...photo, url: new URL(photo.file, photosAt).href, thumb: new URL(photo.thumb, photosAt).href })),
+      }));
   }, 800);
   editor.slots.actions.append(creditWrap);
   editor.slots.captions.append(redoKey);
@@ -281,11 +278,18 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     update();
   }
 
+  /** Where the recording that `time` falls in starts and ends on the editor's timeline, the recordings end to end. */
+  function recordingAround(time: number): Span {
+    const found = editor.recordings.findLast((recording) => recording.start <= time + 1e-6);
+    return found ? [found.start, found.end] : [0, editor.duration];
+  }
+
   /** Transcribes `span`; `open` says whether it may end early, at a sentence's end. */
   async function stretch([start, end]: Span, open: boolean, current: () => boolean) {
-    const duration = editor.duration;
-    const from = Math.max(0, start - PAD);
-    const samples = await editor.readAudio(from, Math.min(duration, end + PAD), SPEECH_RATE);
+    // The second either side stays inside the stretch's own recording, so no stretch hears two files glued together.
+    const [first, last] = recordingAround(start);
+    const from = Math.max(first, start - PAD);
+    const samples = await editor.readAudio(from, Math.min(last, end + PAD), SPEECH_RATE);
     if (!current()) return;
     if (isSilent(samples)) return coverage.add(start, end);
     working = [start, end];
@@ -317,10 +321,13 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       }
       while (current()) {
         const duration = editor.duration;
-        const span = coverage.next(duration, editor.parts.length ? editor.parts : [editor.range], STRETCH, LEAD);
-        if (!span) break;
+        const next = coverage.next(duration, editor.parts.length ? editor.parts : [editor.range], STRETCH, LEAD);
+        if (!next) break;
+        // A stretch ends with its recording, so the next one starts a stretch of its own.
+        const ends = recordingAround(next[0])[1];
+        const span: Span = [next[0], Math.min(next[1], ends)];
         // A stretch cut short by the end or by captions already written ends where it is told to.
-        const open = span[1] - span[0] >= STRETCH - 1e-6 && span[1] < duration - 1e-6 && !coverage.has(span[1], span[1] + 0.01);
+        const open = span[1] - span[0] >= STRETCH - 1e-6 && span[1] < ends - 1e-6 && !coverage.has(span[1], span[1] + 0.01);
         await stretch(span, open, current);
         update();
       }
