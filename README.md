@@ -55,6 +55,7 @@ Then open http://localhost:4340/demo/.
     adUnit: "",                               // a Google Ad Manager rewarded ad unit, or empty for no ads
     x: "drkxbt",                              // the account the after-download card asks people to follow
     repo: "https://github.com/drkxbt/soundbite",
+    tip: "",                                  // where the card's "Tip in crypto" key leads, or empty for none
     media: "",                                // your stock search endpoint, or empty for no stock media
     klipy: "",                                // an address that answers { key } for KLIPY, or empty for no KLIPY
   });

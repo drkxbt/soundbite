@@ -9,10 +9,12 @@ export interface Config {
   x: string;
   /** The repo the panel asks people to star. */
   repo: string;
+  /** Where the panel's "Tip in crypto" key leads, a web address or the page's own path; empty for no tip key. */
+  tip: string;
   /** The hosting site's stock search, which keeps the sources' keys; empty for no stock photos, videos or stickers. */
   media: string;
   /** The hosting site's address that answers `{ key }` with a KLIPY app key; empty for no KLIPY stickers or GIFs. */
   klipy: string;
 }
 
-export const config: Config = { adUnit: "", x: "drkxbt", repo: "https://github.com/drkxbt/soundbite", media: "", klipy: "" };
+export const config: Config = { adUnit: "", x: "drkxbt", repo: "https://github.com/drkxbt/soundbite", tip: "", media: "", klipy: "" };
