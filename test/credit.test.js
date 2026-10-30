@@ -51,7 +51,7 @@ test("the credit is a small label in the top right corner, inside the margin abo
   }
 });
 
-test("with no ad unit set up, removing the credit needs no ad", async () => {
+test("with no ad unit set up, a crowned size needs no ad", async () => {
   assert.equal(await watchAd(""), "granted");
 });
 

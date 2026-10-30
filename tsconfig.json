@@ -27,6 +27,8 @@
     "kit.ts",
     "credit.ts",
     "ads.ts",
+    "tiers.ts",
+    "music.ts",
     "config.ts",
     "app.ts",
     "panel.ts",

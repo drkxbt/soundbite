@@ -60,6 +60,10 @@ await writeFile(`${out}/fonts/fonts.json`, JSON.stringify(fonts));
 await rm(`${out}/photos`, { recursive: true, force: true });
 await cp("photos", `${out}/photos`, { recursive: true });
 
+// The free music scripts/music.py writes, served from here like the photos.
+await rm(`${out}/music`, { recursive: true, force: true });
+await cp("music", `${out}/music`, { recursive: true });
+
 // The emoji, icons and brand logos for the Elements panel, from the packages that ship them. A drawing the converter
 // can't draw, or a featured one a newer release has dropped, is only worth a mention, so it never stops the build.
 const { sets } = await writeDrawings(`${out}/drawings`);

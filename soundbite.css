@@ -1,5 +1,5 @@
-/* Soundbite: Audiogram's editor in drk.vc's dark world, with its captions key at the top and its credit key by
-   Download. Every colour is a custom property, so a host page can retheme it from outside. */
+/* Soundbite: Audiogram's editor in drk.vc's dark world, with its captions key at the top and a note under Download
+   for the ads a crowned size plays. Every colour is a custom property, so a host page can retheme it from outside. */
 .sb {
   --sb-ground: #0c0c0d;
   --sb-panel: #121214;
@@ -87,10 +87,8 @@
 }
 .sb[data-working] .sb-meter { display: block; }
 
-/* With the credit off, its key shows it, in the mint of a clean download, and what happened shows under it a moment. */
-.sb[data-clean] .sb-credit { background: var(--sb-mint-wash); color: var(--sb-mint-text); }
-.sb-credit-wrap { position: relative; display: flex; }
-.sb-credit-note {
+/* What happened to an ad shows under Download a moment. */
+.sb-ad-note {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -110,11 +108,23 @@
   pointer-events: none;
   transition: opacity 160ms ease, translate 160ms var(--sb-ease);
 }
-.sb[data-credit-note] .sb-credit-note { opacity: 1; translate: 0 0; }
+.sb[data-ad-note] .sb-ad-note { opacity: 1; translate: 0 0; }
 /* On the dark panel, keys get an edge so they read as keys. */
 .sb .ag-key:not(.ag-export):not(.sb-transcribe), .sb .ag-tab[aria-selected="true"], .sb .ag-tile { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }
 .sb .ag-tile[aria-checked="true"] { box-shadow: inset 0 0 0 1.5px var(--ag-accent); }
 .sb .sb-redo { justify-self: start; height: 30px; font-size: 12.5px; }
+
+/* The free music: a row a track, a key to hear it, its name and mood, and Use. */
+.sb-music { display: grid; gap: 8px; margin-top: 18px; }
+.sb-music .ag-help { margin: 0; }
+.sb-tracks { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.sb-track { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; background: var(--ag-surface); }
+.sb-track-play { width: 34px; height: 34px; padding: 0; justify-content: center; }
+.sb-track-play[aria-pressed="true"] { background: var(--ag-accent); color: var(--ag-accent-ink); }
+.sb-track-words { display: grid; min-width: 0; }
+.sb-track-name { overflow: hidden; color: var(--ag-text); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sb-track-mood { color: var(--ag-muted); font-size: 11.5px; }
+.sb-track-use { height: 30px; font-size: 12.5px; }
 
 .sb-editor { flex: 1; min-height: 0; }
 .sb-editor > .ag { height: 100%; }
@@ -124,8 +134,7 @@
   .sb .sb-captions { order: -1; flex: 1 1 100%; }
   .sb .sb-progress { max-width: none; }
   .sb .ag-header .ag-grow { display: none; }
-  .sb .ag-header > .ag-key, .sb .sb-credit-wrap { flex: 1 1 auto; justify-content: center; }
-  .sb .sb-credit { flex: 1; justify-content: center; }
+  .sb .ag-header > .ag-key { flex: 1 1 auto; justify-content: center; }
 }
 
 /* After a download: a card in the middle of the screen, five stars landing one after another over its thanks. */
@@ -229,6 +238,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sb-meter::after, .sb-credit-note { transition: none; }
+  .sb-meter::after, .sb-ad-note { transition: none; }
   .sb-thanks[open], .sb-thanks[open]::backdrop, .sb-thanks-stars span, .sb-thanks-stars i { animation: none; }
 }

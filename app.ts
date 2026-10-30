@@ -3,6 +3,8 @@ import { isSilent, SPEECH_RATE } from "./audio.js";
 import { watchAd } from "./ads.js";
 import { config, type Config } from "./config.js";
 import { credit } from "./credit.js";
+import { TIERS, unlock, type Tier } from "./tiers.js";
+import { musicLibrary } from "./music.js";
 import { dropHallucinations, mergeCues, wordsToCues } from "./cues.js";
 import { dataUrlBlob, loadKit, saveKit, shrinkCover, type Kit } from "./kit.js";
 import type { FontEntry } from "./fonts.js";
@@ -22,7 +24,6 @@ const ICONS = {
   pause: '<rect class="fill" x="6.5" y="5" width="4" height="14" rx="1"/><rect class="fill" x="13.5" y="5" width="4" height="14" rx="1"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>',
   redo: '<path d="M19 12a7 7 0 1 1-2.05-4.95M19 4.5V9h-4.5"/>',
-  credit: '<path d="M4 5.5h16v13H4z"/><path d="M13 8.5h4.5M15.5 8.5v.01"/><path d="m8 15 2.5-2.5L13 15"/>',
 };
 
 // The drawing sets the build writes to drawings/, in the order Elements shows them.
@@ -73,8 +74,8 @@ export interface Soundbite {
 
 /**
  * Soundbite in `container`: the Audiogram editor, with a captions key at the top that writes the captions of the whole
- * recording on this device, part by part, and a key by Download that takes the corner credit off for one download
- * after a rewarded ad. Downloads end with the follow and star panel.
+ * recording on this device, part by part, and Download's sizes: 360p and 720p free with the corner credit, 1080p and
+ * 1440p without it after rewarded ads. Downloads end with the follow and star panel.
  */
 export function soundbite(container: HTMLElement, { autoTranscribe = true, ...options }: SoundbiteOptions = {}): Soundbite {
   const settings: Config = { ...config, ...options };
@@ -106,22 +107,16 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   const redoKey = key("sb-redo", "Redo clip captions", ICONS.redo);
   redoKey.title = "Write this clip's captions again from scratch";
 
-  // Without an ad unit the credit comes off for free, and the key says so. The key also puts the credit back.
-  const removeLabel = settings.adUnit ? "Watch a short ad to remove the credit from your next download" : "Remove the credit from your next download";
-  const creditWrap = document.createElement("div");
-  creditWrap.className = "sb-credit-wrap";
-  const creditKey = key("sb-credit", "Remove credit", ICONS.credit);
-  // What happened to the credit, shown under its key for a few seconds and read out once.
-  const creditNote = document.createElement("p");
-  creditNote.className = "sb-credit-note";
-  creditNote.setAttribute("role", "status");
-  creditWrap.append(creditKey, creditNote);
+  // What happened to an ad, shown under Download for a few seconds and read out once.
+  const adNote = document.createElement("p");
+  adNote.className = "sb-ad-note";
+  adNote.setAttribute("role", "status");
   let noteTimer = 0;
-  const noteCredit = (text: string) => {
-    creditNote.textContent = text;
-    root.toggleAttribute("data-credit-note", Boolean(text));
+  const noteAd = (text: string, hold = 6000) => {
+    adNote.textContent = text;
+    root.toggleAttribute("data-ad-note", Boolean(text));
     clearTimeout(noteTimer);
-    if (text) noteTimer = window.setTimeout(() => noteCredit(""), 6000);
+    if (text && hold) noteTimer = window.setTimeout(() => noteAd(""), hold);
   };
 
   const stage = document.createElement("div");
@@ -131,7 +126,6 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
 
   // The kit the user left last time fills the editor in; the picture comes back as the data URL it was kept as.
   const kit = loadKit();
-  let creditOn = true;
   let savedTimer = 0;
   const shrunk = new WeakMap<Blob, Promise<string>>();
 
@@ -171,6 +165,22 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     page: first ? first.page : legacy ? (blank ? undefined : null) : kit.page,
     theme: first ? first.theme : legacy && blank ? undefined : kit.theme,
     overlay: credit,
+    qualities: TIERS,
+    // A crowned size plays its ads first; without an ad unit (a fork, or local work) it is made straight away.
+    beforeDownload: async ({ quality }) => {
+      const tier = quality as Tier;
+      if (!tier.ads) return true;
+      if (settings.adUnit) noteAd(tier.ads > 1 ? "Loading two short ads" : "Loading a short ad", 0);
+      const result = await unlock(tier, () => watchAd(settings.adUnit));
+      if (result === "granted") {
+        noteAd("");
+        return true;
+      }
+      noteAd(result === "closed"
+        ? `The ad closed early, so the ${tier.short}p download stopped. 720p needs no ad.`
+        : "The ad didn't load. If you use an ad blocker, allow ads here and try again, or pick 720p.");
+      return false;
+    },
     // A recording added to the clip has its captions written as soon as it is in, the way the first one does.
     onRecordings: () => (autoTranscribe && ready() && !running && !warning ? void work() : update()),
     onChange: (next) => {
@@ -187,15 +197,14 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       link.download = `soundbite-${stamp}.${extension}`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-      // A still of one moment is a side download: the clean video a watched ad paid for is kept for the clip itself.
       if (extension === "png") return;
-      // A watched ad buys one clean download; the next clip carries the credit again. The key is locked while a
-      // video is made, so the credit was already off when this one started.
-      if (!creditOn) setCredit(true);
       showThanks(root, settings);
     },
   });
   editor.slots.header.append(captionsControl);
+  // The free music, from the folder the build copies next to the app.
+  const library = musicLibrary(new URL("./music/", import.meta.url), (file) => editor.setMusic(file));
+  editor.slots.music.append(library.element);
   // The fonts the build bundled, listed next to the app, each file fetched only when a layer uses it.
   const fontsAt = new URL("./fonts/", import.meta.url);
   void fetch(new URL("fonts.json", fontsAt))
@@ -264,7 +273,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       });
     }
   }, 800);
-  editor.slots.actions.append(creditWrap);
+  editor.slots.actions.append(adNote);
   editor.slots.captions.append(redoKey);
 
   // Captions for the whole recording, a stretch at a time: what the user has selected goes first, then the rest from
@@ -403,52 +412,11 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   // The clip's own captions written again, for when they came out wrong; then the rest carries on.
   redoKey.addEventListener("click", () => void work(editor.parts.length ? editor.parts : [editor.range]));
 
-  // The credit.
-
-  function setCredit(on: boolean) {
-    creditOn = on;
-    editor.setOverlay(on ? credit : null);
-    root.toggleAttribute("data-clean", !on);
-    relabel(creditKey, on ? "Remove credit" : "Put credit back", ICONS.credit);
-    creditKey.title = on ? removeLabel : "Your next download has no credit. Press to put it back";
-    lockCredit();
-  }
-
-  // The key rests while an ad loads and while a video is made from the current look.
-  let adLoading = false;
-  function lockCredit() {
-    creditKey.disabled = adLoading || editor.element.dataset.state === "exporting";
-  }
-
-  async function toggleCredit() {
-    if (!creditOn) {
-      setCredit(true);
-      noteCredit("The credit is back");
-      return;
-    }
-    adLoading = true;
-    lockCredit();
-    if (settings.adUnit) noteCredit("Loading a short ad");
-    const result = await watchAd(settings.adUnit);
-    adLoading = false;
-    if (result === "granted") {
-      setCredit(false);
-      noteCredit("Your next download has no credit");
-      return;
-    }
-    setCredit(true);
-    noteCredit(result === "closed"
-      ? "The ad closed early, so the credit stays."
-      : "The ad didn't load, so the credit stays. If you use an ad blocker, allow ads here and try again.");
-  }
-  creditKey.addEventListener("click", () => void toggleCredit());
-
   // The keys follow the editor. A recording that has just opened gets its captions written straight away.
   let opened: string | Blob | null = null;
   const watcher = new MutationObserver(() => {
     // Another recording opening ends work on the one before it.
     if (running && editor.element.dataset.state === "loading") stop();
-    lockCredit();
     if (ready() && editor.source && editor.source !== opened) {
       // Captions belong to the recording they were heard in: a new one replacing another starts with none.
       if (opened) editor.setCaptions([]);
@@ -460,13 +428,13 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     update();
   });
   watcher.observe(editor.element, { attributes: true, attributeFilter: ["data-state"] });
-  setCredit(true);
   update();
 
   return {
     editor,
     destroy() {
       stop();
+      library.stop();
       clearTimeout(noteTimer);
       watcher.disconnect();
       editor.destroy();

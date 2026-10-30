@@ -1437,7 +1437,8 @@ const scriptRed = template("script-red", "Script Red", { color: "#b8141f", to: "
     heading(f, c, title, 3, f.by({ square: 12, portrait: 18, story: 24, landscape: 0 })),
     captions(f, c, words, f.by({ square: 2, portrait: 3, story: 4, landscape: 0 }), f.by({ square: 14, portrait: 22, story: 32, landscape: 0 })),
     space(),
-    bars(f, f.width / 2 - f.px(120), f.px(240), f.by({ square: 40, portrait: 46, story: 52, landscape: 0 }), cream),
+    // Wide and tall enough that any sound style reads, a wave as well as bars.
+    bars(f, f.width / 2 - f.px(180), f.px(360), f.by({ square: 56, portrait: 64, story: 72, landscape: 0 }), cream),
   ]);
 });
 

@@ -3,7 +3,7 @@
  * fork points the after-download panel at its own X account and repo.
  */
 export interface Config {
-  /** A Google Ad Manager rewarded ad unit path. Empty means the credit comes off without an ad. */
+  /** A Google Ad Manager rewarded ad unit path, for the crowned download sizes. Empty means they need no ad. */
   adUnit: string;
   /** The X account the panel asks people to follow, without the @. */
   x: string;
