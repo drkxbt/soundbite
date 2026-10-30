@@ -127,6 +127,8 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
   // The kit the user left last time fills the editor in; the picture comes back as the data URL it was kept as.
   const kit = loadKit();
   let savedTimer = 0;
+  // The size picked for the download being made, for its file name.
+  let size = 0;
   const shrunk = new WeakMap<Blob, Promise<string>>();
 
   // The cover is kept small, as a 256 px square. A background is a layer of its design now, its picture kept with the
@@ -169,6 +171,7 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
     // A crowned size plays its ads first; without an ad unit (a fork, or local work) it is made straight away.
     beforeDownload: async ({ quality }) => {
       const tier = quality as Tier;
+      size = tier.short;
       if (!tier.ads) return true;
       if (settings.adUnit) noteAd(tier.ads > 1 ? "Loading two short ads" : "Loading a short ad", 0);
       const result = await unlock(tier, () => watchAd(settings.adUnit));
@@ -191,10 +194,10 @@ export function soundbite(container: HTMLElement, { autoTranscribe = true, ...op
       const link = document.createElement("a");
       const now = new Date();
       const two = (n: number) => String(n).padStart(2, "0");
-      // Local time, so the name matches the clock of whoever made it.
-      const stamp = `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}`;
+      // Local time to the second, and the size, so two downloads a minute apart, or at two sizes, never share a name.
+      const stamp = `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
       link.href = URL.createObjectURL(blob);
-      link.download = `soundbite-${stamp}.${extension}`;
+      link.download = `soundbite-${stamp}${size ? `-${size}p` : ""}.${extension}`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
       if (extension === "png") return;
